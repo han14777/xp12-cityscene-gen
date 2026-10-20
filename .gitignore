@@ -1,0 +1,15 @@
+# Generated output and caches
+build/
+jobs/*
+!jobs/.gitkeep
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Machine paths (written by the GUI settings)
+config/local.yaml
+
+Thumbs.db
+.DS_Store

@@ -1,0 +1,98 @@
+:root {
+  --bg: #f6f5f2;
+  --panel: #ffffff;
+  --text: #1f2328;
+  --muted: #646a73;
+  --line: #dedbd4;
+  --accent: #2f6fb0;
+  --accent-text: #ffffff;
+  --ok: #2e7d4f;
+  --warn: #b26a00;
+  --err: #b3261e;
+  --code-bg: #f1efea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171a;
+    --panel: #1d2024;
+    --text: #e6e6e3;
+    --muted: #9aa0a8;
+    --line: #33373d;
+    --accent: #6aa3dc;
+    --accent-text: #0e1114;
+    --ok: #6cc28f;
+    --warn: #e0a85a;
+    --err: #f08a80;
+    --code-bg: #24282d;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  display: flex;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+#panel {
+  width: 360px;
+  flex: none;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  padding: 16px;
+}
+#map { flex: 1; height: 100%; }
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+.sub, .hint, footer { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
+section, details { border-top: 1px solid var(--line); padding: 12px 0; }
+header { padding-bottom: 8px; }
+summary { cursor: pointer; font-weight: 600; }
+label { display: block; margin: 8px 0; font-size: 13px; }
+label.check { display: flex; gap: 6px; align-items: center; }
+input:not([type=checkbox]), select {
+  display: block; width: 100%; margin-top: 4px; padding: 6px 8px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit;
+}
+button {
+  padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); font: inherit; cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button.ghost { background: transparent; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row input { flex: 1; }
+#area { font-variant-numeric: tabular-nums; }
+#steps { list-style: none; padding: 0; margin: 0 0 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+#steps li { padding: 4px 8px; border-radius: 6px; background: var(--code-bg); color: var(--muted); font-size: 12px; }
+#steps li.active { color: var(--accent); font-weight: 600; }
+#steps li.done { color: var(--ok); }
+#steps li.done::before { content: "✓ "; }
+#steps li.failed { color: var(--err); }
+#log {
+  background: var(--code-bg); border-radius: 6px; padding: 8px; margin: 0;
+  max-height: 240px; overflow: auto; font-size: 11px; white-space: pre-wrap; word-break: break-all;
+}
+#summary { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+#summary dt { color: var(--muted); }
+#summary dd { margin: 0; }
+#message { min-height: 1.5em; font-size: 13px; }
+#message.ok { color: var(--ok); }
+#message.err { color: var(--err); }
+#message.warn { color: var(--warn); }
+.ok-flag { color: var(--ok); }
+.bad-flag { color: var(--err); }
+.legend { background: var(--panel); color: var(--text); padding: 6px 8px; border-radius: 6px; font-size: 11px; line-height: 1.6; }
+.legend i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; border-radius: 2px; }
+@media (max-width: 720px) {
+  body { flex-direction: column; }
+  #panel { width: 100%; height: auto; max-height: 55%; border-right: 0; border-bottom: 1px solid var(--line); }
+  #map { min-height: 45%; }
+}
+.title-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#lang { display: flex; flex: none; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+#lang button { border: 0; border-radius: 0; padding: 3px 9px; font-size: 12px; background: transparent; color: var(--muted); }
+#lang button.on { background: var(--accent); color: var(--accent-text); font-weight: 600; }

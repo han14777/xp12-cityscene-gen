@@ -1,0 +1,154 @@
+"""Step 1, fetch: download buildings (building + building:part) and roads (highway) for the area from
+Overpass and cache them in jobs/<name>/raw/.
+
+- The area's bounding box is expanded by osm.bbox_buffer_m in projected coordinates; the exact filter
+  (centroid inside the area) happens in clean
+- Large areas are queried in chunks on a globally aligned osm.chunk_deg grid, each cached separately,
+  so small edits to the area do not re-download chunks already on disk
+- Cached chunks are skipped; force=True re-downloads everything
+"""
+
+import json
+import math
+import time
+from datetime import datetime, timezone
+
+import requests
+from shapely.geometry import box
+
+from cityscene.geo import Projector, metric_crs_for, zones_union
+from cityscene.log import get_logger
+
+log = get_logger("fetch")
+
+USER_AGENT = "xp12-cityscene-gen/0.1 (X-Plane scenery generator)"
+
+QUERIES = {
+    "buildings": (
+        '(\n  way["building"]{area};\n  relation["building"]{area};\n'
+        '  way["building:part"]{area};\n  relation["building:part"]{area};\n);\n'
+    ),
+    "roads": 'way["highway"]{area};\n',
+}
+
+
+def query_bbox(zones: list, buffer_m: float) -> tuple[float, float, float, float]:
+    """Area bounding box expanded by buffer_m metres, as (west, south, east, north)."""
+    projector = Projector(metric_crs_for(zones))
+    minx, miny, maxx, maxy = projector.to_metric(zones_union(zones)).bounds
+    expanded = box(minx - buffer_m, miny - buffer_m, maxx + buffer_m, maxy + buffer_m)
+    return projector.to_wgs84(expanded).bounds
+
+
+def chunks(bbox: tuple, chunk_deg: float) -> list:
+    """Split the bounding box on a globally aligned grid; returns [(south, west, north, east)] rounded to 6 decimals (used in file names)."""
+    west, south, east, north = bbox
+    out = []
+    for j in range(math.floor(south / chunk_deg), math.ceil(north / chunk_deg)):
+        for i in range(math.floor(west / chunk_deg), math.ceil(east / chunk_deg)):
+            s, w = j * chunk_deg, i * chunk_deg
+            cell = (round(max(s, south), 6), round(max(w, west), 6),
+                    round(min(s + chunk_deg, north), 6), round(min(w + chunk_deg, east), 6))
+            if cell[0] >= cell[2] or cell[1] >= cell[3]:
+                continue
+            out.append(cell)
+    return out
+
+
+def build_query(kind: str, swne: tuple, timeout_s: int) -> str:
+    area = "({},{},{},{})".format(*swne)
+    return f"[out:json][timeout:{timeout_s}];\n" + QUERIES[kind].format(area=area) + "out body;\n>;\nout skel qt;\n"
+
+
+def post_overpass(url: str, query: str, timeout_s: int, max_retries: int, backoff_s: float) -> dict:
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.post(url, data={"data": query}, headers={"User-Agent": USER_AGENT},
+                                     timeout=timeout_s + 30)
+            if response.status_code == 200:
+                return response.json()
+            log.warning("第 %d 次请求返回 HTTP %d", attempt, response.status_code)
+        except (requests.RequestException, ValueError) as exc:
+            log.warning("第 %d 次请求失败：%s", attempt, exc)
+        if attempt < max_retries:
+            wait = backoff_s * attempt
+            log.info("%.0f 秒后重试", wait)
+            time.sleep(wait)
+    raise RuntimeError(f"Overpass 请求 {max_retries} 次均失败，请稍后再试或换 osm.overpass_url")
+
+
+def merge_overpass(datasets: list) -> dict:
+    """Merge several Overpass JSON results (neighbouring chunks overlap), de-duplicated by (type, id); the tagged copy of an element wins."""
+    merged = {}
+    for data in datasets:
+        for element in data["elements"]:
+            key = (element["type"], element["id"])
+            if key not in merged or ("tags" in element and "tags" not in merged[key]):
+                merged[key] = element
+    return {"elements": list(merged.values())}
+
+
+def chunk_path(raw_dir, kind: str, swne: tuple):
+    return raw_dir / f"{kind}_{'_'.join(f'{v:.6f}' for v in swne)}.json"
+
+
+def cached_cover(raw_dir, kind: str, swne: tuple):
+    """A cached chunk file that fully covers swne (reused when an edited area shrinks or shifts slightly), else None."""
+    s, w, n, e = swne
+    for path in sorted(raw_dir.glob(f"{kind}_*.json")):
+        try:
+            cs, cw, cn, ce = (float(v) for v in path.stem.split("_")[1:])
+        except ValueError:
+            continue
+        if cs <= s and cw <= w and cn >= n and ce >= e:
+            return path
+    return None
+
+
+def fetch(job, settings: dict, force: bool = False) -> dict:
+    """Download and cache; returns {kind: chunk count}."""
+    osm = settings["osm"]
+    zones = job.zones()
+    bbox = query_bbox(zones, osm["bbox_buffer_m"])
+    cells = chunks(bbox, osm["chunk_deg"])
+    job.raw_dir.mkdir(parents=True, exist_ok=True)
+    log.info("外包框 (W,S,E,N) = %s，分 %d 块", tuple(round(v, 5) for v in bbox), len(cells))
+
+    files = {}
+    for kind in QUERIES:
+        files[kind] = []
+        for n, swne in enumerate(cells, 1):
+            cached = None if force else cached_cover(job.raw_dir, kind, swne)
+            if cached is not None:
+                files[kind].append(cached.name)
+                continue
+            path = chunk_path(job.raw_dir, kind, swne)
+            log.info("下载 %s 第 %d/%d 块 %s", kind, n, len(cells), swne)
+            query = build_query(kind, swne, osm["request_timeout_s"])
+            data = post_overpass(osm["overpass_url"], query, osm["request_timeout_s"],
+                                 osm["max_retries"], osm["retry_backoff_s"])
+            data["_meta"] = {
+                "query": query,
+                "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "osm_base_timestamp": data.get("osm3s", {}).get("timestamp_osm_base"),
+            }
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(path)
+            files[kind].append(path.name)
+    (job.raw_dir / "chunks.json").write_text(
+        json.dumps({"bbox_wsen": bbox, "chunks": cells, "files": files}, indent=1), encoding="utf-8")
+    log.info("下载完成（缓存于 %s）", job.raw_dir)
+    return {kind: len(names) for kind, names in files.items()}
+
+
+def load(job, kind: str) -> dict | None:
+    """Load and merge the chunks used by the current area; None when the cache is missing."""
+    index = job.raw_dir / "chunks.json"
+    if not index.exists():
+        return None
+    names = json.loads(index.read_text(encoding="utf-8"))["files"].get(kind, [])
+    paths = [job.raw_dir / name for name in names]
+    if not paths or not all(p.exists() for p in paths):
+        return None
+    return merge_overpass([json.loads(p.read_text(encoding="utf-8")) for p in paths])

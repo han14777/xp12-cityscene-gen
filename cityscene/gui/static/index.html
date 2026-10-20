@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XP12 City Scenery</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<aside id="panel">
+  <header>
+    <div class="title-row">
+      <h1 data-i18n="title">XP12 City Scenery</h1>
+      <div id="lang" role="group" aria-label="Language">
+        <button data-lang="en">EN</button><button data-lang="zh">中文</button>
+      </div>
+    </div>
+    <p class="sub" data-i18n="subtitle"></p>
+  </header>
+
+  <details id="settings-box">
+    <summary><span data-i18n="settings"></span> <span id="settings-flag"></span></summary>
+    <label><span data-i18n="xplaneDir"></span><input id="xplane-root" placeholder="E:/SteamLibrary/steamapps/common/X-Plane 12"></label>
+    <label>DSFTool.exe<input id="dsftool" placeholder="D:/xptools/tools/DSFTool.exe"></label>
+    <button id="save-settings" data-i18n="save"></button>
+    <p class="hint" data-i18n="dsftoolHint"></p>
+  </details>
+
+  <section>
+    <h2 data-i18n="s1"></h2>
+    <div class="row">
+      <input id="search" data-i18n-placeholder="searchPh">
+    </div>
+    <p class="hint" data-i18n="drawHint"></p>
+    <p id="area"></p>
+    <button id="clear-zone" class="ghost" data-i18n="clearZone"></button>
+  </section>
+
+  <section>
+    <h2 data-i18n="s2"></h2>
+    <label><span data-i18n="jobName"></span><input id="job-name" placeholder="sydney_cbd"></label>
+    <label><span data-i18n="sceneryName"></span><input id="scenery-name" placeholder="CityScene_sydney_cbd"></label>
+    <label><span data-i18n="defaultHeight"></span><input id="default-height" type="number" min="3" max="100" step="1"></label>
+    <label class="check"><input id="force-fetch" type="checkbox"> <span data-i18n="forceFetch"></span></label>
+    <button id="build" class="primary" data-i18n="build"></button>
+    <label><span data-i18n="existingJobs"></span><select id="jobs"><option value="">—</option></select></label>
+  </section>
+
+  <section id="progress-box" hidden>
+    <h2 data-i18n="s3"></h2>
+    <ol id="steps">
+      <li data-step="fetch" data-i18n="stepFetch"></li>
+      <li data-step="clean" data-i18n="stepClean"></li>
+      <li data-step="classify" data-i18n="stepClassify"></li>
+      <li data-step="build_dsf" data-i18n="stepDsf"></li>
+    </ol>
+    <pre id="log"></pre>
+  </section>
+
+  <section id="result-box" hidden>
+    <h2 data-i18n="s4"></h2>
+    <dl id="summary"></dl>
+    <label class="check"><input id="show-buildings" type="checkbox" checked> <span data-i18n="showBuildings"></span></label>
+    <div class="row">
+      <button id="install" class="primary" data-i18n="install"></button>
+      <button id="uninstall" class="ghost" data-i18n="uninstall"></button>
+    </div>
+    <p class="hint" data-i18n="installHint"></p>
+  </section>
+
+  <p id="message" role="status"></p>
+  <footer data-i18n="footer"></footer>
+</aside>
+<main id="map"></main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="/static/i18n.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

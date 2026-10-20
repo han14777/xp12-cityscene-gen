@@ -1,0 +1,112 @@
+# Global defaults. Code never hard-codes paths; everything is read from here.
+# Machine paths (X-Plane, DSFTool) go in config/local.yaml (not in git; the GUI "Local settings" writes it),
+# which overrides keys of the same name. A job's options (jobs/<name>/job.json) then override heights /
+# classification and similar sections.
+
+xplane:
+  # When empty, read from %LOCALAPPDATA%/x-plane_install_12.txt (written by the X-Plane 12 installer)
+  root: ""
+
+tools:
+  # DSFTool from XPTools (https://developer.x-plane.com/tools/xptools/)
+  dsftool: ""
+
+paths:
+  jobs_dir: "jobs"
+  build_dir: "build"
+
+osm:
+  overpass_url: "https://overpass-api.de/api/interpreter"
+  # Buffer (metres) added to the area's bounding box for queries; the exact filter by centroid happens in clean
+  bbox_buffer_m: 100
+  # Large areas are queried in chunks on a lon/lat grid of this size (degrees) to avoid Overpass timeouts
+  chunk_deg: 0.05
+  request_timeout_s: 180
+  # overpass-api.de often returns 504 in a row when busy; the wait grows with each retry
+  max_retries: 6
+  retry_backoff_s: 30
+  # Refuse areas larger than this (km²): Overpass load and DSF size get out of hand; split the area instead
+  max_area_km2: 400
+
+dsf:
+  # Exclusions are tiled from rectangles: the area is covered with exclusion_cell_m squares, and cells at least
+  # half inside are merged into rectangles. In XP12 polygon exclusions have no effect, rectangles do
+  exclusion_cell_m: 10
+  # Only default buildings are excluded (objects, facades); roads, polygons, lines and forests are kept
+  exclusion_types: [obj, fac]
+
+install:
+  # The pack's line in scenery_packs.ini goes before the first line containing any of these strings (tried in
+  # order), or at the top if none matches. Exclusions only affect packs loaded later (lower in the file), so the
+  # pack must sit above third-party autogen such as simHeaven
+  insert_before: ["*GLOBAL_AIRPORTS*"]
+
+heights:
+  # Height priority: OSM height -> building:levels x level_height_m -> default
+  default_height_m: 12.0
+  # Small standalone structures without height data (kiosks, substations) below this footprint get a low default
+  small_structure_max_area_m2: 100.0
+  small_structure_height_m: 4.0
+  level_height_m: 3.2
+  max_valid_height_m: 350.0
+
+clean:
+  # Facades are extruded from the ground and cannot show elevated structures
+  drop_building_values: ["roof", "bridge", "carport", "canopy"]
+  drop_tags:
+    amenity: ["shelter"]
+    "tower:type": ["bridge", "communication"]
+  min_area_m2: 10.0
+  duplicate_iou: 0.9
+
+roads:
+  # Buildings are checked only against drivable roads; tunnels, covered ways, bridges and underground roads are not
+  drivable: [motorway, motorway_link, trunk, trunk_link, primary, primary_link, secondary, secondary_link,
+             tertiary, tertiary_link, unclassified, residential, living_street, service]
+  ignore_service: [parking_aisle, driveway, drive-through]
+  # Assumed carriageway half width (metres); most OSM roads have no width tag
+  half_width_m: {motorway: 7, trunk: 6, primary: 6, secondary: 5, tertiary: 4, default: 3, service: 2}
+  centerline_min_inside_m: 3.0
+  on_road_share: 0.5
+
+classification:
+  high_rise_min_m: 60.0
+  mid_rise_min_m: 20.0
+  heritage_building_values: ["church", "cathedral", "chapel"]
+  # Preferred facade styles per category, in order; if none fits the floor range, any style is used
+  styles:
+    high_rise: ["glass", "modern", "universal"]
+    mid_rise: ["modern", "classic"]
+    low_rise: ["modern", "classic"]
+    heritage: ["classic"]
+  # Floor height (metres) assumed when converting height to floors
+  facade_floor_height_m: 3.5
+
+# X-Plane 12 default generic facades (12.4.4, taken from Resources/default scenery/1000 autogen/library.txt and the
+# FLOORS_MIN / FLOORS_MAX of each .fac; floors_max null means unlimited). FLOORS_MIN/MAX make X-Plane cut or raise
+# a building to fit, so pick a facade whose range covers the floor count.
+# Known gap: there is no 1-floor generic facade, so 1-2 storey buildings are drawn with at least 2 floors
+facades:
+  - {path: "lib/buildings/facades/generic/high_glass_01.fac", style: glass, floors_min: 3, floors_max: null}
+  - {path: "lib/buildings/facades/generic/high_glass_02.fac", style: glass, floors_min: 3, floors_max: 32}
+  - {path: "lib/buildings/facades/generic/high_glass_03.fac", style: glass, floors_min: 3, floors_max: 32}
+  - {path: "lib/buildings/facades/generic/high_metallic_01.fac", style: glass, floors_min: 3, floors_max: 30}
+  - {path: "lib/buildings/facades/generic/high_modern_01.fac", style: modern, floors_min: 3, floors_max: null}
+  - {path: "lib/buildings/facades/generic/high_modern_02.fac", style: modern, floors_min: 3, floors_max: null}
+  - {path: "lib/buildings/facades/generic/high_modern_03.fac", style: modern, floors_min: 3, floors_max: 31}
+  - {path: "lib/buildings/facades/generic/high_modern_04.fac", style: modern, floors_min: 3, floors_max: 31}
+  - {path: "lib/buildings/facades/generic/high_modern_05.fac", style: modern, floors_min: 3, floors_max: 34}
+  - {path: "lib/buildings/facades/generic/high_modern_06.fac", style: modern, floors_min: 3, floors_max: 31}
+  - {path: "lib/buildings/facades/generic/high_modern_07.fac", style: modern, floors_min: 3, floors_max: 33}
+  - {path: "lib/buildings/facades/generic/mid_modern_01.fac", style: modern, floors_min: 3, floors_max: 8}
+  - {path: "lib/buildings/facades/generic/mid_modern_02.fac", style: modern, floors_min: 3, floors_max: 7}
+  - {path: "lib/buildings/facades/generic/mid_modern_03.fac", style: modern, floors_min: 3, floors_max: 9}
+  - {path: "lib/buildings/facades/generic/mid_modern_04.fac", style: modern, floors_min: 3, floors_max: 13}
+  - {path: "lib/buildings/facades/generic/mid_modern_05.fac", style: modern, floors_min: 3, floors_max: 13}
+  - {path: "lib/buildings/facades/generic/low_modern_01.fac", style: modern, floors_min: 2, floors_max: 2}
+  - {path: "lib/buildings/facades/generic/high_universal_01.fac", style: universal, floors_min: 4, floors_max: 60}
+  - {path: "lib/buildings/facades/generic/high_universal_02.fac", style: universal, floors_min: 4, floors_max: 60}
+  - {path: "lib/buildings/facades/generic/high_classic_01.fac", style: classic, floors_min: 6, floors_max: 12}
+  - {path: "lib/buildings/facades/generic/high_classic_02.fac", style: classic, floors_min: 3, floors_max: null}
+  - {path: "lib/buildings/facades/generic/mid_classic_01.fac", style: classic, floors_min: 3, floors_max: 10}
+  - {path: "lib/buildings/facades/generic/mid_classic_02.fac", style: classic, floors_min: 3, floors_max: 9}
