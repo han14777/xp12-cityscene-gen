@@ -251,6 +251,20 @@ def test_end_to_end_builds_verified_dsf(tmp_path):
     assert kinds == {"sim/exclude_obj", "sim/exclude_fac"}
     assert (job.root / "build.log").read_text(encoding="utf-8").count("build_dsf finished") == 1
 
+    # Distant blocks: placed in the DSF (survive the round trip) and their OBJs exist in the pack
+    objects_dir = job.build_dir(settings) / "objects" / "impostors"
+    defs = [line.split()[1] for line in roundtrip.splitlines() if line.startswith("OBJECT_DEF")]
+    assert built["impostor_objects"] == len(defs) > 0
+    assert sum(line.startswith("OBJECT ") for line in roundtrip.splitlines()) == len(defs)
+    assert "PROPERTY sim/require_object 1/0" in roundtrip
+    assert all((job.build_dir(settings) / d).is_file() for d in defs)
+    assert (objects_dir / "impostor_atlas.png").is_file()
+
+    # A render distance inside every facade's own range needs no distant blocks
+    settings["dsf"]["render_distance_km"] = 5
+    reports = pipeline.run(job, settings, steps=["build_dsf"])
+    assert reports["build_dsf"]["impostor_objects"] == 0 and not objects_dir.exists()
+
     # Output blocks: centroid inside the area, valid geometry, height in (0, 350)
     features = json.loads((job.processed_dir / "buildings_classified.geojson").read_text(encoding="utf-8"))["features"]
     zone = shape(ZONE)

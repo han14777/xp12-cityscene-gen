@@ -1,7 +1,7 @@
 """Command line: python -m cityscene <command>
 
   gui                                    start the browser map UI (default http://127.0.0.1:8765)
-  new <name> (--bbox W,S,E,N | --zone file.geojson) [--scenery pack] [--default-height 12]
+  new <name> (--bbox W,S,E,N | --zone file.geojson) [--scenery pack] [--default-height 12] [--render-distance 30]
   build <name> [--steps fetch,clean,...] [--force-fetch]
   install <name> / uninstall <name>
   list
@@ -40,6 +40,7 @@ def main(argv=None) -> int:
     group.add_argument("--zone", help="area GeoJSON file")
     p.add_argument("--scenery", help="scenery pack name (default CityScene_<name>)")
     p.add_argument("--default-height", type=float, help="default height in metres when OSM has none")
+    p.add_argument("--render-distance", type=float, help="how far buildings stay visible, in km (default 30)")
     p.add_argument("--overwrite", action="store_true")
 
     p = sub.add_parser("build", help="run the pipeline")
@@ -65,6 +66,8 @@ def main(argv=None) -> int:
             else:
                 zone = args.bbox
             options = {"heights": {"default_height_m": args.default_height}} if args.default_height else {}
+            if args.render_distance:
+                options["dsf"] = {"render_distance_km": args.render_distance}
             job = Job.create(args.name, zone, settings, args.scenery, options, overwrite=args.overwrite)
             print(f"Created job {job.name}: {job.root}")
         elif args.command == "build":

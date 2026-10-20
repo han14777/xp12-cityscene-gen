@@ -123,6 +123,7 @@ async function loadStatus() {
   renderStatus(s);
   $("settings-box").open = !(s.xplane_ok && s.dsftool_ok);
   if (!$("default-height").value) $("default-height").value = s.defaults.default_height_m;
+  if (!$("render-distance").value) $("render-distance").value = s.defaults.render_distance_km;
   return s;
 }
 
@@ -182,6 +183,8 @@ async function openJob(name, fit) {
   $("scenery-name").value = d.meta.scenery_name;
   const dh = d.meta.options?.heights?.default_height_m;
   if (dh) $("default-height").value = dh;
+  const rd = d.meta.options?.dsf?.render_distance_km;
+  if (rd) $("render-distance").value = rd;
   zoneLayer.clearLayers();
   L.geoJSON(d.zone).eachLayer((l) => zoneLayer.addLayer(l));
   updateArea();
@@ -203,6 +206,8 @@ $("build").onclick = async () => {
     const options = {};
     const dh = parseFloat($("default-height").value);
     if (dh > 0) options.heights = { default_height_m: dh };
+    const rd = parseFloat($("render-distance").value);
+    if (rd > 0) options.dsf = { render_distance_km: rd };
     await api("/api/jobs", { body: {
       name, scenery_name: $("scenery-name").value.trim(), zone: zoneLayer.toGeoJSON(), options, overwrite: existing,
     } });

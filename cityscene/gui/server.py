@@ -117,6 +117,7 @@ def status() -> dict:
         "defaults": {
             "default_height_m": settings["heights"]["default_height_m"],
             "level_height_m": settings["heights"]["level_height_m"],
+            "render_distance_km": settings["dsf"]["render_distance_km"],
             "max_area_km2": settings["osm"]["max_area_km2"],
         },
     }

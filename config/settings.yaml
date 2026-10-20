@@ -44,6 +44,18 @@ dsf:
   exclusion_cell_m: 10
   # Only default buildings are excluded (objects, facades); roads, polygons, lines and forests are kept
   exclusion_types: [obj, fac]
+  # How far the generated buildings stay visible (km). Default facades draw up to their own LOD (lod_m below,
+  # 8-18 km); past that, merged low-poly blocks (cityscene/impostors.py) take over up to this distance. Values at or
+  # below a facade's LOD add nothing for it: default facades cannot be made to stop earlier
+  render_distance_km: 30
+  impostors:
+    # Blocks are merged per cell_m grid cell; walls reach sink_m below ground; outlines simplified by simplify_m
+    cell_m: 250
+    sink_m: 10
+    simplify_m: 1.5
+    # Blocks appear this much before the facade disappears (facade distance is per building, block distance per
+    # cell origin; half a 250 m cell diagonal is about 177 m)
+    overlap_m: 200
 
 install:
   # The pack's line in scenery_packs.ini goes before the first line containing any of these strings (tried in
@@ -93,30 +105,30 @@ classification:
   facade_floor_height_m: 3.5
 
 # X-Plane 12 default generic facades (12.4.4, taken from Resources/default scenery/1000 autogen/library.txt and the
-# FLOORS_MIN / FLOORS_MAX of each .fac; floors_max null means unlimited). FLOORS_MIN/MAX make X-Plane cut or raise
+# FLOORS_MIN / FLOORS_MAX and LOD of each .fac; floors_max null means unlimited; lod_m is the facade's draw distance). FLOORS_MIN/MAX make X-Plane cut or raise
 # a building to fit, so pick a facade whose range covers the floor count.
 # Known gap: there is no 1-floor generic facade, so 1-2 storey buildings are drawn with at least 2 floors
 facades:
-  - {path: "lib/buildings/facades/generic/high_glass_01.fac", style: glass, floors_min: 3, floors_max: null}
-  - {path: "lib/buildings/facades/generic/high_glass_02.fac", style: glass, floors_min: 3, floors_max: 32}
-  - {path: "lib/buildings/facades/generic/high_glass_03.fac", style: glass, floors_min: 3, floors_max: 32}
-  - {path: "lib/buildings/facades/generic/high_metallic_01.fac", style: glass, floors_min: 3, floors_max: 30}
-  - {path: "lib/buildings/facades/generic/high_modern_01.fac", style: modern, floors_min: 3, floors_max: null}
-  - {path: "lib/buildings/facades/generic/high_modern_02.fac", style: modern, floors_min: 3, floors_max: null}
-  - {path: "lib/buildings/facades/generic/high_modern_03.fac", style: modern, floors_min: 3, floors_max: 31}
-  - {path: "lib/buildings/facades/generic/high_modern_04.fac", style: modern, floors_min: 3, floors_max: 31}
-  - {path: "lib/buildings/facades/generic/high_modern_05.fac", style: modern, floors_min: 3, floors_max: 34}
-  - {path: "lib/buildings/facades/generic/high_modern_06.fac", style: modern, floors_min: 3, floors_max: 31}
-  - {path: "lib/buildings/facades/generic/high_modern_07.fac", style: modern, floors_min: 3, floors_max: 33}
-  - {path: "lib/buildings/facades/generic/mid_modern_01.fac", style: modern, floors_min: 3, floors_max: 8}
-  - {path: "lib/buildings/facades/generic/mid_modern_02.fac", style: modern, floors_min: 3, floors_max: 7}
-  - {path: "lib/buildings/facades/generic/mid_modern_03.fac", style: modern, floors_min: 3, floors_max: 9}
-  - {path: "lib/buildings/facades/generic/mid_modern_04.fac", style: modern, floors_min: 3, floors_max: 13}
-  - {path: "lib/buildings/facades/generic/mid_modern_05.fac", style: modern, floors_min: 3, floors_max: 13}
-  - {path: "lib/buildings/facades/generic/low_modern_01.fac", style: modern, floors_min: 2, floors_max: 2}
-  - {path: "lib/buildings/facades/generic/high_universal_01.fac", style: universal, floors_min: 4, floors_max: 60}
-  - {path: "lib/buildings/facades/generic/high_universal_02.fac", style: universal, floors_min: 4, floors_max: 60}
-  - {path: "lib/buildings/facades/generic/high_classic_01.fac", style: classic, floors_min: 6, floors_max: 12}
-  - {path: "lib/buildings/facades/generic/high_classic_02.fac", style: classic, floors_min: 3, floors_max: null}
-  - {path: "lib/buildings/facades/generic/mid_classic_01.fac", style: classic, floors_min: 3, floors_max: 10}
-  - {path: "lib/buildings/facades/generic/mid_classic_02.fac", style: classic, floors_min: 3, floors_max: 9}
+  - {path: "lib/buildings/facades/generic/high_glass_01.fac", style: glass, floors_min: 3, floors_max: null, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/high_glass_02.fac", style: glass, floors_min: 3, floors_max: 32, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_glass_03.fac", style: glass, floors_min: 3, floors_max: 32, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_metallic_01.fac", style: glass, floors_min: 3, floors_max: 30, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_modern_01.fac", style: modern, floors_min: 3, floors_max: null, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_modern_02.fac", style: modern, floors_min: 3, floors_max: null, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/high_modern_03.fac", style: modern, floors_min: 3, floors_max: 31, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_modern_04.fac", style: modern, floors_min: 3, floors_max: 31, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_modern_05.fac", style: modern, floors_min: 3, floors_max: 34, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_modern_06.fac", style: modern, floors_min: 3, floors_max: 31, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_modern_07.fac", style: modern, floors_min: 3, floors_max: 33, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/mid_modern_01.fac", style: modern, floors_min: 3, floors_max: 8, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/mid_modern_02.fac", style: modern, floors_min: 3, floors_max: 7, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/mid_modern_03.fac", style: modern, floors_min: 3, floors_max: 9, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/mid_modern_04.fac", style: modern, floors_min: 3, floors_max: 13, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/mid_modern_05.fac", style: modern, floors_min: 3, floors_max: 13, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/low_modern_01.fac", style: modern, floors_min: 2, floors_max: 2, lod_m: 8000}
+  - {path: "lib/buildings/facades/generic/high_universal_01.fac", style: universal, floors_min: 4, floors_max: 60, lod_m: 18000}
+  - {path: "lib/buildings/facades/generic/high_universal_02.fac", style: universal, floors_min: 4, floors_max: 60, lod_m: 18000}
+  - {path: "lib/buildings/facades/generic/high_classic_01.fac", style: classic, floors_min: 6, floors_max: 12, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/high_classic_02.fac", style: classic, floors_min: 3, floors_max: null, lod_m: 15000}
+  - {path: "lib/buildings/facades/generic/mid_classic_01.fac", style: classic, floors_min: 3, floors_max: 10, lod_m: 10000}
+  - {path: "lib/buildings/facades/generic/mid_classic_02.fac", style: classic, floors_min: 3, floors_max: 9, lod_m: 10000}

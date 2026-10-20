@@ -43,7 +43,7 @@ The UI is in English by default; switch with the EN / 中文 buttons next to the
 ## Command line
 
 ```
-python -m cityscene new sydney_cbd --bbox 151.200,-33.875,151.215,-33.860
+python -m cityscene new sydney_cbd --bbox 151.200,-33.875,151.215,-33.860 --render-distance 30
 python -m cityscene build sydney_cbd            # fetch → clean → classify → build_dsf
 python -m cityscene build sydney_cbd --steps clean,classify,build_dsf   # after changing settings, no re-download
 python -m cityscene install sydney_cbd
@@ -53,6 +53,13 @@ python -m cityscene list
 
 `--zone area.geojson` works too (e.g. drawn and exported from geojson.io).
 
+## Render distance
+
+X-Plane 12's default facades stop drawing at 8–18 km (set inside each facade). Past that, merged low-poly blocks
+with a simple window texture take over, up to the render distance chosen in the UI (default 30 km, `--render-distance`
+on the command line, `dsf.render_distance_km` in the settings). A value below a facade's own range does not shorten
+it. Larger distances cost some frame rate.
+
 ## Pipeline
 
 | Step | What it does |
@@ -60,7 +67,7 @@ python -m cityscene list
 | fetch | Downloads `building`, `building:part` and `highway` from Overpass in grid chunks, cached per job; chunks already covering the area are reused |
 | clean | Assembles outlines and relations, keeps buildings whose centroid is in the area, splits `building:part`s, fills heights (`height` → `building:levels` × level height → default), cuts or drops buildings sitting on roads, removes duplicates and overlaps (tallest wins) |
 | classify | Sorts buildings into high / mid / low rise and heritage, and picks a default facade whose floor range fits |
-| build_dsf | Writes one DSF per 1° tile with rectangle exclusions for objects and facades, compiles with DSFTool, then decompiles to check nothing was dropped |
+| build_dsf | Writes one DSF per 1° tile with rectangle exclusions for objects and facades, compiles with DSFTool, then decompiles to check nothing was dropped. Adds simplified distant blocks so buildings stay visible up to the render distance |
 
 ## Files
 
@@ -69,7 +76,7 @@ python -m cityscene list
 | `config/settings.yaml` | Global defaults: height rules, cleaning thresholds, facade list, exclusion types |
 | `config/local.yaml` | Machine paths (X-Plane, DSFTool), not committed |
 | `jobs/<job>/` | `job.json`, `zone.geojson`, `raw/` (Overpass cache), `processed/` (intermediate results and reports), `build.log` |
-| `build/<pack>/` | The generated scenery pack, linked into Custom Scenery on install |
+| `build/<pack>/` | The generated scenery pack (`Earth nav data/` DSFs, `objects/impostors/` distant blocks), linked into Custom Scenery on install |
 
 ## What install does
 

@@ -39,7 +39,7 @@ python -m cityscene gui        # 或双击 start_gui.bat
 ## 命令行
 
 ```
-python -m cityscene new sydney_cbd --bbox 151.200,-33.875,151.215,-33.860
+python -m cityscene new sydney_cbd --bbox 151.200,-33.875,151.215,-33.860 --render-distance 30
 python -m cityscene build sydney_cbd            # fetch → clean → classify → build_dsf
 python -m cityscene build sydney_cbd --steps clean,classify,build_dsf   # 改了设置后重跑，不重新下载
 python -m cityscene install sydney_cbd
@@ -49,6 +49,12 @@ python -m cityscene list
 
 也可以用 `--zone area.geojson` 指定选区（例如在 geojson.io 画好后导出）。
 
+## 渲染距离
+
+X-Plane 12 自带 facade 只显示到 8–18 公里（由各 facade 自身设定）。更远处由合并的低模体块（带简单的窗户贴图）接替，
+一直显示到界面里选的渲染距离（默认 30 公里；命令行用 `--render-distance`，设置文件为 `dsf.render_distance_km`）。
+设得比 facade 自身距离还小，并不会让 facade 提前消失。距离越大，帧率开销越大。
+
 ## 处理流程
 
 | 步骤 | 做什么 |
@@ -56,7 +62,7 @@ python -m cityscene list
 | fetch | 从 Overpass 按网格分块下载 `building`、`building:part` 和 `highway`，按任务缓存；已覆盖选区的块直接复用 |
 | clean | 组装轮廓和关系，只保留质心在选区内的建筑，拆分 `building:part`，补高度（`height` → `building:levels` × 层高 → 默认值），切割或剔除压在路上的建筑，去重并消除重叠（高的优先） |
 | classify | 把建筑分为高层 / 中层 / 低层和历史建筑，并选楼层范围合适的默认 facade |
-| build_dsf | 每个 1° 瓦片写一个 DSF，用矩形排除区屏蔽默认物件和 facade，用 DSFTool 编译后再反编译，核对没有丢失 |
+| build_dsf | 每个 1° 瓦片写一个 DSF，用矩形排除区屏蔽默认物件和 facade，用 DSFTool 编译后再反编译，核对没有丢失；并加入简化的远景体块，让建筑一直显示到渲染距离 |
 
 ## 文件
 
@@ -65,7 +71,7 @@ python -m cityscene list
 | `config/settings.yaml` | 全局默认：高度规则、清洗阈值、facade 列表、排除类型 |
 | `config/local.yaml` | 本机路径（X-Plane、DSFTool），不进 git |
 | `jobs/<任务>/` | `job.json`、`zone.geojson`、`raw/`（Overpass 缓存）、`processed/`（中间结果和报告）、`build.log` |
-| `build/<地景包>/` | 生成的地景包，安装时链接到 Custom Scenery |
+| `build/<地景包>/` | 生成的地景包（`Earth nav data/` 中的 DSF、`objects/impostors/` 中的远景体块），安装时链接到 Custom Scenery |
 
 ## 安装做了什么
 

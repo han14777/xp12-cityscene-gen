@@ -11,9 +11,12 @@ The DSF text follows melbourne-cbd-xp12 pipeline/04_build_dsf.py, all verified i
 - Facades cannot have holes: blocks with courtyards are cut along vertical lines through each hole
   (split_holes), otherwise the courtyard would be filled in
 - Blocks go to the tile containing their centroid; blocks with vertices outside that tile are skipped and counted
+- Distant blocks (impostors.py) beyond the facades' LOD up to dsf.render_distance_km: OBJECT_DEF <path relative to
+  the pack root>, OBJECT <index> <lon> <lat> <heading> (README.dsf2text), with sim/require_object 1/0 like the
+  facades so they load at any object density
 
-Output: processed/<tile>.dsf.txt, build/<pack>/Earth nav data/<10-degree folder>/<tile>.dsf, README.txt,
-build_report.json
+Output: processed/<tile>.dsf.txt, build/<pack>/Earth nav data/<10-degree folder>/<tile>.dsf,
+build/<pack>/objects/impostors/, README.txt, build_report.json
 """
 
 import json
@@ -28,6 +31,7 @@ from shapely.geometry import Polygon, box, mapping, shape
 from shapely.geometry.polygon import orient
 
 from cityscene.tools_setup import ensure_dsftool
+from cityscene import impostors
 from cityscene.dsf_rects import exclusion_rects
 from cityscene.geo import Projector, metric_crs_for, tile_dir, tile_name, tiles_for, zones_union
 from cityscene.log import get_logger
@@ -114,8 +118,9 @@ def _add_piece(polygon_m, p: dict, projector: Projector, by_tile: dict, stats: C
     by_tile[(lat0, lon0)].append((p["facade"], p["height_m"], lonlat))
 
 
-def build_text(tile: tuple, polygons: list, zones: list, settings: dict) -> tuple[str, dict]:
-    """DSF text for one tile. zones are the area Features; only their part inside this tile becomes exclusions."""
+def build_text(tile: tuple, polygons: list, zones: list, settings: dict, objects: list = ()) -> tuple[str, dict]:
+    """DSF text for one tile. zones are the area Features; only their part inside this tile becomes exclusions.
+    objects: [(object path relative to the pack root, lon, lat)], placed with heading 0."""
     lat, lon = tile
     tile_box = box(lon, lat, lon + 1, lat + 1)
     lines = [
@@ -132,6 +137,8 @@ def build_text(tile: tuple, polygons: list, zones: list, settings: dict) -> tupl
         "PROPERTY sim/overlay 1",
         "PROPERTY sim/require_facade 1/0",
     ]
+    if objects:
+        lines.append("PROPERTY sim/require_object 1/0")
     rect_count = 0
     for zone in zones:
         part = shape(zone["geometry"]).intersection(tile_box)
@@ -143,18 +150,25 @@ def build_text(tile: tuple, polygons: list, zones: list, settings: dict) -> tupl
             rect_count += 1
     lines.append("")
 
+    object_index: dict[str, int] = {}
+    for path, _, _ in objects:
+        object_index.setdefault(path, len(object_index))
     facade_index: dict[str, int] = {}
     for facade, _, _ in polygons:
         facade_index.setdefault(facade, len(facade_index))
+    lines += [f"OBJECT_DEF {path}" for path in object_index]
     lines += [f"POLYGON_DEF {path}" for path in facade_index]
     lines.append("")
+    for path, lon_, lat_ in objects:
+        lines.append(f"OBJECT {object_index[path]} {lon_:.9f} {lat_:.9f} 0")
     for facade, height, lonlat in polygons:
         lines.append(f"BEGIN_POLYGON {facade_index[facade]} {max(1, round(height))} 2")
         lines.append("BEGIN_WINDING")
         lines += [f"POLYGON_POINT {x:.9f} {y:.9f}" for x, y in lonlat]
         lines.append("END_WINDING")
         lines.append("END_POLYGON")
-    report = {"polygons": len(polygons), "facade_defs": len(facade_index), "exclusion_rects": rect_count}
+    report = {"polygons": len(polygons), "facade_defs": len(facade_index), "exclusion_rects": rect_count,
+              "objects": len(objects)}
     return "\n".join(lines) + "\n", report
 
 
@@ -203,15 +217,20 @@ def run(job, settings: dict) -> dict:
 
     build_dir = job.build_dir(settings)
     earth = build_dir / "Earth nav data"
-    if earth.exists():
-        shutil.rmtree(earth)
+    impostor_dir = build_dir / "objects" / "impostors"
+    for old_output in (earth, impostor_dir):
+        if old_output.exists():
+            shutil.rmtree(old_output)
     build_dir.mkdir(parents=True, exist_ok=True)
+    impostors.write_atlas(impostor_dir)
     (build_dir / "README.txt").write_text(ATTRIBUTION.format(name=job.scenery_name), encoding="utf-8")
 
     report = {"input_blocks": len(features), "tiles": {}, **dict(stats)}
     for tile in tiles:
         name = tile_name(*tile)
-        text, tile_report = build_text(tile, by_tile.get(tile, []), zones, settings)
+        objects, imp_stats = impostors.build_impostors(name, by_tile.get(tile, []), settings, impostor_dir, projector)
+        text, tile_report = build_text(tile, by_tile.get(tile, []), zones, settings, objects)
+        tile_report.update(imp_stats)
         text_path = processed / f"{name}.dsf.txt"
         text_path.write_text(text, encoding="utf-8", newline="\n")
         dsf_path = earth / tile_dir(*tile) / f"{name}.dsf"
@@ -224,11 +243,20 @@ def run(job, settings: dict) -> dict:
                  tile_report["polygons"], tile_report["facade_defs"], tile_report["exclusion_rects"],
                  tile_report["dsf_bytes"])
     report["polygons"] = sum(t["polygons"] for t in report["tiles"].values())
+    report["render_distance_km"] = settings["dsf"]["render_distance_km"]
+    for key in ("impostor_objects", "impostor_triangles"):
+        report[key] = sum(t[key] for t in report["tiles"].values())
+    if not report["impostor_objects"]:
+        shutil.rmtree(impostor_dir)
+        if not any(impostor_dir.parent.iterdir()):
+            impostor_dir.parent.rmdir()
     report["roundtrip_verified"] = True
     with open(processed / "build_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
     skipped = {k: v for k, v in report.items() if k.startswith("skipped_")}
     log.info("%d blocks -> %d facade polygons; skipped %s; holes dropped %d", len(features), report["polygons"],
              skipped or 0, report.get("holes_dropped", 0))
+    log.info("Render distance %g km: %d distant-block objects, %d triangles", report["render_distance_km"],
+             report["impostor_objects"], report["impostor_triangles"])
     log.info("Scenery pack: %s", build_dir)
     return report
