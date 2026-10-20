@@ -16,6 +16,8 @@ API:
   GET  /api/jobs/<name>/reference?id=   one building as a Wavefront OBJ for Blender (download)
   POST /api/jobs/<name>/install | uninstall
   GET  /api/packs                       scenery packs made by this tool that can be imported as jobs
+  POST /api/bbbike/url                  {zone, name} BBBike extract form link with the area's polygon filled in
+  GET  /api/bbbike/status?name=         state of that extract on BBBike's status page (waiting / running / ready + link)
   POST /api/pick                        {kind: folder | exe | obj, title, initial} native file dialog -> {path}
   POST /api/jobs/<name>/models          {path} copy an OBJ (and its textures) into the job's models folder
   POST /api/import                      {path, name, overwrite} import a pack as a job
@@ -30,9 +32,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from cityscene import install as installer
-from cityscene import fetch, overrides, pipeline, transfer
+from cityscene import bbbike, fetch, overrides, pipeline, transfer
 from cityscene.gui import picker
-from cityscene.config import Job, dsftool_path, list_jobs, load_settings, save_local, xplane_root
+from cityscene.config import Job, dsftool_path, list_jobs, load_settings, normalize_zone, save_local, xplane_root
 from cityscene.log import get_logger
 from cityscene.tools_setup import ensure_dsftool
 
@@ -195,6 +197,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(status())
             if parts == ["api", "packs"]:
                 return self._json(transfer.find_packs(load_settings()))
+            if parts == ["api", "bbbike", "status"]:
+                return self._json(bbbike.status(parse_qs(url.query).get("name", [""])[0]))
             if parts == ["api", "jobs"]:
                 settings = load_settings()
                 jobs = []
@@ -241,6 +245,10 @@ class Handler(BaseHTTPRequestHandler):
                 save_local({"xplane": {"root": body.get("xplane_root", "").strip()},
                             "tools": {"dsftool": body.get("dsftool", "").strip()}})
                 return self._json(status())
+            if parts == ["api", "bbbike", "url"]:
+                zones = normalize_zone(body.get("zone") or {})["features"]
+                name = str(body.get("name") or "cityscene").strip()[:60]
+                return self._json({"url": bbbike.form_url(zones, settings["osm"]["bbox_buffer_m"], name), "name": name})
             if parts == ["api", "overpass"]:
                 save_local({"osm": {"overpass_url": fetch.clean_server_list(body.get("urls"))}})
                 return self._json(status())

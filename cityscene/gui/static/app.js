@@ -177,6 +177,7 @@ function refreshLanguage() {
   if (selectedId) fillEditForm();
   updatePanelToggle();
   renderServers();
+  if (lastBbbike) showBbbike(lastBbbike.key, lastBbbike.cls);
 }
 
 document.querySelectorAll("#lang button").forEach((b) => {
@@ -353,19 +354,76 @@ document.querySelectorAll('input[name="source"]').forEach((r) => {
   r.onchange = () => { $("source-file-box").hidden = sourceType() !== "file"; };
 });
 
-// Opens BBBike's extract page with the drawn area (plus a small margin) and PBF format filled in; the user adds an
-// e-mail address and submits there, then pastes the link from the e-mail (or chooses the downloaded file) here
-$("bbbike").onclick = () => {
+// BBBike: open its extract form with the area's polygon filled in (the user submits it there), then follow BBBike's
+// public status page once a minute until the file is ready and put its link in the data source field.
+// The request is remembered in this browser, so tracking resumes after a reload.
+const BBBIKE_POLL_MS = 60000;
+const BBBIKE_GIVE_UP_MS = 2 * 3600 * 1000;
+let bbbikeTimer = null;
+
+function bbbikeRequest() {
+  try { return JSON.parse(store.get("cityscene.bbbike") || "null"); } catch (e) { return null; }
+}
+
+let lastBbbike = null;
+
+function showBbbike(key, cls = "") {
+  lastBbbike = key ? { key, cls } : null;
+  $("bbbike-track").hidden = !key;
+  $("bbbike-state").textContent = key ? t(key, { name: bbbikeRequest()?.name || "" }) : "";
+  $("bbbike-state").className = cls;
+}
+
+function stopBbbike() {
+  clearTimeout(bbbikeTimer);
+  store.set("cityscene.bbbike", "null");
+  showBbbike(null);
+}
+
+async function pollBbbike() {
+  clearTimeout(bbbikeTimer);
+  const req = bbbikeRequest();
+  if (!req) return showBbbike(null);
+  if (Date.now() - req.started > BBBIKE_GIVE_UP_MS) { showBbbike("bbbikeGaveUp", "warn"); store.set("cityscene.bbbike", "null"); return; }
+  try {
+    const s = await api(`/api/bbbike/status?name=${encodeURIComponent(req.name)}`);
+    if (s.state === "ready") {
+      document.querySelector('input[name="source"][value="file"]').checked = true;
+      $("source-file-box").hidden = false;
+      $("source-file").value = s.link;
+      store.set("cityscene.bbbike", "null");
+      showBbbike("bbbikeReady", "ok");
+      say("bbbikeReadyMsg", {}, "ok");
+      return;
+    }
+    showBbbike(s.state === "not_found" ? "bbbikeNotYet" : s.state === "running" ? "bbbikeRunning" : "bbbikeWaiting");
+  } catch (e) {
+    showBbbike("bbbikeCheckFailed", "warn");
+  }
+  bbbikeTimer = setTimeout(pollBbbike, BBBIKE_POLL_MS);
+}
+
+$("bbbike").onclick = async () => {
   if (!zoneLayer.getLayers().length) return say("needZone", {}, "warn");
-  const b = zoneLayer.getBounds().pad(0.05);
-  const f = (v) => v.toFixed(5);
-  const params = new URLSearchParams({
-    sw_lng: f(b.getWest()), sw_lat: f(b.getSouth()), ne_lng: f(b.getEast()), ne_lat: f(b.getNorth()),
-    format: "osm.pbf", city: currentJob || $("job-name").value.trim() || "cityscene",
-  });
-  window.open("https://extract.bbbike.org/?" + params.toString(), "_blank", "noopener");
-  say("bbbikeOpened", {}, "ok");
+  // A random suffix makes the name unique on BBBike's public status page
+  const base = (currentJob || $("job-name").value.trim() || "area").replace(/[^\w-]/g, "_");
+  const name = `cityscene ${base} ${Math.random().toString(16).slice(2, 6)}`;
+  // Open the tab first (inside the click), then point it at the form, so pop-up blockers allow it
+  const tab = window.open("about:blank", "_blank");
+  try {
+    const r = await api("/api/bbbike/url", { body: { zone: zoneLayer.toGeoJSON(), name } });
+    if (tab) tab.location = r.url; else window.open(r.url, "_blank");
+    store.set("cityscene.bbbike", JSON.stringify({ name: r.name, started: Date.now() }));
+    say("bbbikeOpened", {}, "ok");
+    showBbbike("bbbikeNotYet");
+    bbbikeTimer = setTimeout(pollBbbike, BBBIKE_POLL_MS);
+  } catch (e) {
+    if (tab) tab.close();
+    sayError(e);
+  }
 };
+
+$("bbbike-stop").onclick = stopBbbike;
 
 $("job-name").addEventListener("input", (e) => {
   $("scenery-name").placeholder = "CityScene_" + (e.target.value || "name");
@@ -810,3 +868,4 @@ addDrawControl();
 updateArea();
 loadStatus().catch(sayError);
 showTab(startTab);
+if (bbbikeRequest()) { $("source-file-box").hidden = false; pollBbbike(); }

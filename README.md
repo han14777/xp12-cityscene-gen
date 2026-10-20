@@ -105,9 +105,9 @@ When the Overpass servers are busy or unreachable, choose "OSM file (.osm.pbf) o
 the project settings and give a local `.osm.pbf` / `.osm` file or a download link:
 
 - [BBBike](https://extract.bbbike.org/): ready-made files for about 200 cities, or a custom area. "Get this area from
-  BBBike…" opens its page with the drawn area filled in; enter your e-mail, press extract, and after a few minutes
-  paste the download link from the e-mail (or download the file and choose it). BBBike is free for personal use
-  under a fair-use policy and runs on donations
+  BBBike…" opens its page with the outline of the drawn area filled in; enter your e-mail (or "nobody") and press
+  extract. The UI then checks BBBike's public status page once a minute and fills in the download link when the
+  file is ready (usually 2–7 minutes). BBBike is free for personal use under a fair-use policy and runs on donations
 - [Geofabrik](https://download.geofabrik.de/): files per country or state, updated daily
 
 The file is read with [pyosmium](https://osmcode.org/pyosmium/); the buildings and roads in the area are taken out
