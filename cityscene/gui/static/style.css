@@ -111,6 +111,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; border-radius: 2px; }
 .legend hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .legend i.edit { background: transparent; border: 2px solid; }
+.legend i.nodata { border: 1px solid; }
 .legend i.delete { background: transparent; border: 1px dashed; }
 .legend i.model { border: 2px solid; background: #7b3fb5; }
 @media (max-width: 720px) {

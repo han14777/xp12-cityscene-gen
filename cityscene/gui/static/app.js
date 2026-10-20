@@ -140,9 +140,22 @@ map.on(L.Draw.Event.EDITED, updateArea);
 map.on(L.Draw.Event.DELETED, updateArea);
 
 const legend = L.control({ position: "bottomright" });
+// Buildings without OSM height (height_source default / default_small) are drawn white instead of by height
+const NO_DATA_COLOR = "#ffffff";
+const NO_DATA_OUTLINE = "#9aa0a8";
+
+function noHeightData(p) {
+  return String(p.height_source || "").startsWith("default");
+}
+
+function defaultHeight() {
+  return currentDetail?.meta?.options?.heights?.default_height_m ?? lastStatus?.defaults?.default_height_m ?? 12;
+}
+
 legend.onAdd = () => {
   const div = L.DomUtil.create("div", "legend");
-  div.innerHTML = HEIGHT_BANDS.map(([, c, label]) => `<i style="background:${c}"></i>${label}`).join("<br>") +
+  div.innerHTML = `<i class="nodata" style="background:${NO_DATA_COLOR};border-color:${NO_DATA_OUTLINE}"></i>${esc(t("legendNoData", { h: defaultHeight() }))}<br>` +
+    HEIGHT_BANDS.map(([, c, label]) => `<i style="background:${c}"></i>${label}`).join("<br>") +
     "<hr>" + ["edit", "delete", "model"].map((k) => `<i class="${k}" style="border-color:${EDIT_COLORS[k]}"></i>${t("legend_" + k)}`).join("<br>");
   return div;
 };
@@ -677,7 +690,9 @@ function editKind(e) {
 function buildingStyle(f) {
   const p = f.properties;
   const kind = editKind(edits[p.building_id]);
-  const style = { color: heightColor(p.height_m), fillColor: heightColor(p.height_m), weight: 0.6, fillOpacity: 0.65, dashArray: null };
+  const style = noHeightData(p)
+    ? { color: NO_DATA_OUTLINE, fillColor: NO_DATA_COLOR, weight: 0.6, fillOpacity: 0.55, dashArray: null }
+    : { color: heightColor(p.height_m), fillColor: heightColor(p.height_m), weight: 0.6, fillOpacity: 0.65, dashArray: null };
   if (kind === "edit") Object.assign(style, { color: EDIT_COLORS.edit, weight: 2.5 });
   if (kind === "delete") Object.assign(style, { color: EDIT_COLORS.delete, fillOpacity: 0.08, weight: 1, dashArray: "3 3" });
   if (kind === "model") Object.assign(style, { color: EDIT_COLORS.model, fillColor: EDIT_COLORS.model, weight: 1.5, fillOpacity: 0.7 });
@@ -706,7 +721,8 @@ async function loadBuildings() {
       const p = f.properties;
       layer.bindTooltip(() => {
         const kind = editKind(edits[p.building_id]);
-        return `${p.name ? esc(p.name) + "<br>" : ""}${p.height_m} m (${esc(p.height_source)})<br>${esc(p.facade_style)}` +
+        const height = noHeightData(p) ? esc(t("tipNoData", { h: p.height_m })) : `${p.height_m} m (${esc(p.height_source)})`;
+        return `${p.name ? esc(p.name) + "<br>" : ""}${height}<br>${esc(p.facade_style)}` +
           (kind ? `<br><b>${esc(t("legend_" + kind))}</b>` : "");
       });
       layer.on("click", (e) => { L.DomEvent.stopPropagation(e); selectBuilding(p.building_id); });
