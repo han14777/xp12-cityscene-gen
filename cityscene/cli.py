@@ -54,6 +54,12 @@ def main(argv=None) -> int:
         sub.add_parser(cmd).add_argument("name")
     sub.add_parser("list", help="list jobs")
 
+    # Used by the map UI's "Browse..." buttons (cityscene/gui/picker.py): shows a native dialog, prints JSON
+    p = sub.add_parser("pick", help="show a native file / folder dialog and print the choice as JSON (used by the UI)")
+    p.add_argument("kind", choices=["folder", "exe", "obj"])
+    p.add_argument("--title", default="")
+    p.add_argument("--initial", default="")
+
     p = sub.add_parser("import", help="import a scenery pack made by this tool as a job")
     p.add_argument("pack", help="scenery pack folder (e.g. in Custom Scenery)")
     p.add_argument("--name", help="job name (default: the name stored in the pack)")
@@ -85,6 +91,9 @@ def main(argv=None) -> int:
         elif args.command == "build":
             steps = args.steps.split(",") if args.steps else None
             pipeline.run(Job.open(args.name, settings), settings, steps, force_fetch=args.force_fetch)
+        elif args.command == "pick":
+            from cityscene.gui.picker import child_main
+            return child_main(args.kind, args.title, args.initial)
         elif args.command == "import":
             from pathlib import Path
             from cityscene.transfer import import_pack

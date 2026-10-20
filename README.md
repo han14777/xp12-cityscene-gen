@@ -34,6 +34,9 @@ python -m cityscene gui        # or double-click start_gui.bat
 ```
 
 The UI is in English by default; switch with the EN / 中文 buttons next to the title (remembered by the browser).
+Drag the divider next to the map to resize the panel (double-click resets it; the ‹ button hides it), and fold any
+step by its title. Every path field has a "Browse…" button that opens the system's file dialog; paths can also be
+typed. A model picked outside the job is copied into its `models/` folder together with its textures.
 
 1. Search for a city, then draw rectangles or polygons with the tools at the top left of the map (several are fine)
 2. Enter a job name and click "Save area and generate"; progress and logs appear as it runs

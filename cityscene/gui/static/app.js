@@ -37,6 +37,86 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap contributors",
 }).addTo(map);
 
+// ---------- panel layout: drag to resize, collapse, fold steps (remembered per browser) ----------
+const PANEL_MIN = 280;
+const PANEL_DEFAULT = 380;
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode etc. */ } },
+};
+
+function setPanelWidth(w) {
+  const max = Math.max(PANEL_MIN, Math.round(window.innerWidth * 0.7));
+  w = Math.min(max, Math.max(PANEL_MIN, Math.round(w)));
+  document.body.style.setProperty("--panel-w", w + "px");
+  map.invalidateSize();
+  return w;
+}
+
+function updatePanelToggle() {
+  const collapsed = document.body.classList.contains("panel-collapsed");
+  $("panel-toggle").textContent = collapsed ? "›" : "‹";
+  $("panel-toggle").title = t(collapsed ? "panelExpand" : "panelCollapse");
+  $("resizer").title = collapsed ? "" : t("panelResize");
+}
+
+function setCollapsed(collapsed) {
+  document.body.classList.toggle("panel-collapsed", collapsed);
+  store.set("cityscene.panelCollapsed", collapsed ? "1" : "0");
+  updatePanelToggle();
+  map.invalidateSize();
+}
+
+setPanelWidth(Number(store.get("cityscene.panelWidth")) || PANEL_DEFAULT);
+document.body.classList.toggle("panel-collapsed", store.get("cityscene.panelCollapsed") === "1");
+
+$("panel-toggle").addEventListener("pointerdown", (e) => e.stopPropagation());
+$("panel-toggle").addEventListener("dblclick", (e) => e.stopPropagation());
+$("panel-toggle").onclick = () => setCollapsed(!document.body.classList.contains("panel-collapsed"));
+
+$("resizer").addEventListener("pointerdown", (e) => {
+  if (document.body.classList.contains("panel-collapsed")) return;
+  const resizer = $("resizer");
+  const left = $("panel").getBoundingClientRect().left;
+  resizer.setPointerCapture(e.pointerId);
+  resizer.classList.add("dragging");
+  document.body.classList.add("resizing");
+  const move = (ev) => setPanelWidth(ev.clientX - left);
+  const up = (ev) => {
+    resizer.removeEventListener("pointermove", move);
+    resizer.removeEventListener("pointerup", up);
+    resizer.classList.remove("dragging");
+    document.body.classList.remove("resizing");
+    store.set("cityscene.panelWidth", String(setPanelWidth(ev.clientX - left)));
+  };
+  resizer.addEventListener("pointermove", move);
+  resizer.addEventListener("pointerup", up);
+});
+
+$("resizer").addEventListener("dblclick", () => {
+  if (document.body.classList.contains("panel-collapsed")) return;
+  store.set("cityscene.panelWidth", String(setPanelWidth(PANEL_DEFAULT)));
+});
+
+$("resizer").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const now = $("panel").getBoundingClientRect().width;
+  store.set("cityscene.panelWidth", String(setPanelWidth(now + (e.key === "ArrowRight" ? 20 : -20))));
+  e.preventDefault();
+});
+
+window.addEventListener("resize", () => setPanelWidth($("panel").getBoundingClientRect().width || PANEL_DEFAULT));
+
+// Steps fold like "Local settings"; folded steps stay folded on the next visit
+const closedSteps = new Set(JSON.parse(store.get("cityscene.closedSteps") || "[]"));
+document.querySelectorAll("details.step").forEach((d) => {
+  if (d.id !== "settings-box" && closedSteps.has(d.id)) d.open = false;
+  d.addEventListener("toggle", () => {
+    if (d.open) closedSteps.delete(d.id); else closedSteps.add(d.id);
+    store.set("cityscene.closedSteps", JSON.stringify([...closedSteps]));
+  });
+});
+
 const zoneLayer = new L.FeatureGroup().addTo(map);
 let drawControl = null;
 
@@ -94,6 +174,7 @@ function refreshLanguage() {
   if (buildingsLayer) { map.removeControl(legend); legend.addTo(map); }
   renderEditCount();
   if (selectedId) fillEditForm();
+  updatePanelToggle();
 }
 
 document.querySelectorAll("#lang button").forEach((b) => {
@@ -198,7 +279,7 @@ async function loadPacks() {
 
 function renderPacks() {
   $("import-packs").innerHTML = `<option value="">${esc(packList.length ? t("importPick") : t("importNone"))}</option>` +
-    packList.map((p, i) => `<option value="${i}">${esc(p.folder)} · ${esc(t("source_" + p.source))}${p.kind === "legacy" ? " · " + esc(t("legacyTag")) : ""}</option>`).join("");
+    packList.map((p, i) => `<option value="${i}">${esc(p.folder)} · ${esc(t("source_" + p.source))}${p.kind === "legacy" ? " · " + esc(t("legacyTag")) : ""}${p.existing_job ? " · " + esc(t("alreadyImported", { name: p.existing_job })) : ""}</option>`).join("");
 }
 
 $("import-box").addEventListener("toggle", () => { if ($("import-box").open) loadPacks(); });
@@ -469,6 +550,34 @@ $("edit-save").onclick = () => {
 
 $("edit-reset").onclick = () => saveEdit(null);
 
+// ---------- "Browse..." buttons: the local server opens the system's file dialog ----------
+async function useModelFile(path) {
+  const r = await api(`/api/jobs/${currentJob}/models`, { body: { path } });
+  $("edit-model-path").value = r.path;
+  await loadEdits();
+  $("models-hint").textContent = t("modelsHint", { dir: modelsDir, n: modelFiles.length });
+  if (r.missing.length) say("modelMissing", { path: r.path, list: r.missing.join(", ") }, "warn");
+  else if (r.copied.length) say("modelCopied", { path: r.path, n: r.copied.length - 1 }, "ok");
+}
+
+document.querySelectorAll("button.browse").forEach((b) => {
+  b.onclick = async (e) => {
+    e.preventDefault();
+    const input = $(b.dataset.for);
+    const kind = b.dataset.pick;
+    b.disabled = true;
+    say("pickOpen", {}, "");
+    try {
+      const initial = kind === "obj" ? modelsDir : input.value;
+      const r = await api("/api/pick", { body: { kind, title: t("pickTitle_" + b.dataset.for), initial } });
+      say(null, { text: "" });
+      if (!r.path) return;
+      if (kind === "obj") await useModelFile(r.path);
+      else input.value = r.path;
+    } catch (err) { sayError(err); } finally { b.disabled = false; }
+  };
+});
+
 $("edit-reference").onclick = async () => {
   try {
     const res = await fetch(`/api/jobs/${currentJob}/reference?id=${encodeURIComponent(selectedId)}`);
@@ -510,6 +619,7 @@ $("uninstall").onclick = async () => {
 };
 
 applyStaticText();
+updatePanelToggle();
 addDrawControl();
 updateArea();
 loadStatus().catch(sayError);

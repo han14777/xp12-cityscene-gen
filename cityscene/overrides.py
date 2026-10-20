@@ -22,8 +22,9 @@ when exported with XPlane2Blender.
 
 import json
 import math
+import shutil
 from collections import defaultdict
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from shapely.geometry import Polygon, shape
 from shapely.geometry.polygon import orient
@@ -33,6 +34,9 @@ from cityscene.impostors import local_en
 
 STYLES = ("glass", "modern", "classic", "universal")
 MAX_OFFSET_M = 500
+# OBJ8 lines naming texture files (relative to the .obj)
+TEXTURE_KEYS = ("TEXTURE", "TEXTURE_LIT", "TEXTURE_NORMAL", "TEXTURE_DRAPED", "TEXTURE_DRAPED_NORMAL")
+IMAGE_EXTS = (".png", ".dds")
 
 
 def load(job) -> dict:
@@ -48,6 +52,43 @@ def save(job, buildings: dict) -> None:
 
 def model_is_local(job, path: str) -> bool:
     return (job.models_dir / path).is_file()
+
+
+def import_model(job, source: Path) -> dict:
+    """Make an OBJ chosen anywhere on disk usable by this job: a file already under the models folder is used in
+    place; otherwise the OBJ goes to models/<name>/ together with the textures it names (each also in its .png /
+    .dds twin, which X-Plane may load instead), and its texture lines are rewritten to the copied file names.
+    Returns {"path": path relative to the models folder, "copied": [...], "missing": [...]}."""
+    source = Path(source)
+    if not source.is_file() or source.suffix.lower() not in (".obj", ".agp"):
+        raise ValueError(f"{source} is not an .obj or .agp file")
+    models = job.models_dir
+    try:
+        return {"path": source.resolve().relative_to(models.resolve()).as_posix(), "copied": [], "missing": []}
+    except ValueError:
+        pass
+    target_dir = models / source.stem
+    target_dir.mkdir(parents=True, exist_ok=True)
+    copied, missing = [source.name], []
+    # OBJ8 is ASCII; latin-1 round-trips any byte so nothing else in the file changes
+    lines = source.read_text(encoding="latin-1").splitlines(keepends=True)
+    if source.suffix.lower() == ".obj":
+        for i, line in enumerate(lines):
+            words = line.split()
+            if len(words) < 2 or words[0] not in TEXTURE_KEYS:
+                continue
+            texture = (source.parent / words[1].replace("\\", "/")).resolve()
+            twins = [texture.with_suffix(ext) for ext in IMAGE_EXTS] if texture.suffix.lower() in IMAGE_EXTS else [texture]
+            found = [t for t in twins if t.is_file()]
+            if not found:
+                missing.append(words[1])
+                continue
+            for t in found:
+                shutil.copyfile(t, target_dir / t.name)
+                copied.append(t.name)
+            lines[i] = line.replace(words[1], texture.name, 1)
+    (target_dir / source.name).write_text("".join(lines), encoding="latin-1", newline="")
+    return {"path": f"{source.stem}/{source.name}", "copied": sorted(set(copied)), "missing": missing}
 
 
 def validate(job, edit: dict, settings: dict) -> dict:

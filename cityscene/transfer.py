@@ -101,10 +101,11 @@ def _same(a: Path, b: Path) -> bool:
 def find_packs(settings: dict) -> list:
     """Packs made by this tool in Custom Scenery and in the build folder, except those that are already the build
     output of a job in this copy."""
-    own = []
+    own, jobs_by_pack = [], {}
     for name in list_jobs(settings):
         job = Job.open(name, settings)
         own.append(job.build_dir(settings))
+        jobs_by_pack[job.scenery_name] = name
     roots = [("build", project_path(settings["paths"]["build_dir"]))]
     root = xplane_root(settings)
     if root:
@@ -122,8 +123,10 @@ def find_packs(settings: dict) -> list:
                 continue
             seen.append(pack)
             meta = _meta_for(pack, kind)
-            found.append({"path": str(pack), "folder": pack.name, "source": source, "kind": kind,
-                          "name": meta.get("name") or _default_name(pack.name)})
+            name = meta.get("name") or _default_name(pack.name)
+            # A job here already uses this pack name, i.e. it was imported before: importing again replaces it
+            found.append({"path": str(pack), "folder": pack.name, "source": source, "kind": kind, "name": name,
+                          "existing_job": jobs_by_pack.get(meta.get("scenery_name") or pack.name)})
     return found
 
 

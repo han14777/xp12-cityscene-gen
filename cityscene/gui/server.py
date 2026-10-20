@@ -14,6 +14,8 @@ API:
   GET  /api/jobs/<name>/reference?id=   one building as a Wavefront OBJ for Blender (download)
   POST /api/jobs/<name>/install | uninstall
   GET  /api/packs                       scenery packs made by this tool that can be imported as jobs
+  POST /api/pick                        {kind: folder | exe | obj, title, initial} native file dialog -> {path}
+  POST /api/jobs/<name>/models          {path} copy an OBJ (and its textures) into the job's models folder
   POST /api/import                      {path, name, overwrite} import a pack as a job
 """
 
@@ -27,6 +29,7 @@ from urllib.parse import parse_qs, urlparse
 
 from cityscene import install as installer
 from cityscene import overrides, pipeline, transfer
+from cityscene.gui import picker
 from cityscene.config import Job, dsftool_path, list_jobs, load_settings, save_local, xplane_root
 from cityscene.log import get_logger
 from cityscene.tools_setup import ensure_dsftool
@@ -73,7 +76,9 @@ def _start_build(name: str, force_fetch: bool, steps: list | None = None) -> Non
 
 def _installed(job: Job, settings: dict) -> bool:
     root = xplane_root(settings)
-    return bool(root) and (root / "Custom Scenery" / job.scenery_name).exists()
+    # Only a link to this copy's build output counts (the same pack may be installed from another copy)
+    link = root / "Custom Scenery" / job.scenery_name if root else None
+    return bool(link) and link.exists() and installer._same_target(link, job.build_dir(settings))
 
 
 def _read_json(path: Path):
@@ -230,6 +235,9 @@ class Handler(BaseHTTPRequestHandler):
                 save_local({"xplane": {"root": body.get("xplane_root", "").strip()},
                             "tools": {"dsftool": body.get("dsftool", "").strip()}})
                 return self._json(status())
+            if parts == ["api", "pick"]:
+                return self._json({"path": picker.pick(str(body.get("kind")), str(body.get("title") or ""),
+                                                       str(body.get("initial") or ""))})
             if parts == ["api", "import"]:
                 if _run_lock.locked():
                     raise RuntimeError("A job is running; wait for it to finish")
@@ -246,6 +254,8 @@ class Handler(BaseHTTPRequestHandler):
                     Job.open(name, settings)
                     _start_build(name, bool(body.get("force_fetch")), body.get("steps") or None)
                     return self._json({"started": True})
+                if action == "models":
+                    return self._json(overrides.import_model(Job.open(name, settings), Path(str(body.get("path") or ""))))
                 if action == "overrides":
                     job = Job.open(name, settings)
                     building_id = str(body.get("building_id") or "")

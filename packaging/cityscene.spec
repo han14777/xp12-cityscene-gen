@@ -16,7 +16,8 @@ a = Analysis(
         *collect_data_files("pyproj"),
     ],
     hiddenimports=[],
-    excludes=["tkinter", "pytest"],
+    # tkinter stays in: the UI's "Browse..." buttons open native file dialogs through it
+    excludes=["pytest"],
 )
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="CityScene", console=True)
