@@ -3,6 +3,8 @@ name = "xp12-cityscene-gen"
 version = "0.1.0"
 description = "Quick X-Plane 12 city scenery from OpenStreetMap (OSM -> facade DSF), with a browser map UI"
 requires-python = ">=3.11"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "Hanyi Zhang" }]
 dependencies = [
     "pyyaml>=6.0",
     "requests>=2.31",

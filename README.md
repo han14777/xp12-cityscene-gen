@@ -84,6 +84,17 @@ python -m pytest -q
 
 The end-to-end test runs the pipeline on synthetic data without network access and needs DSFTool (skipped otherwise).
 
+## License
+
+Copyright (C) 2026 Hanyi Zhang
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. See [LICENSE](LICENSE).
+
+The license covers this tool's source code only. Scenery it generates contains OpenStreetMap data (ODbL, see
+below) and references the X-Plane 12 default library, neither of which is covered by the GPL.
+
 ## Data and attribution
 
 - Buildings: © OpenStreetMap contributors, ODbL 1.0. Keep the README.txt attribution inside any scenery you publish
