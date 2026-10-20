@@ -8,8 +8,12 @@ xplane:
   root: ""
 
 tools:
-  # DSFTool from XPTools (https://developer.x-plane.com/tools/xptools/)
+  # DSFTool from XPTools (https://developer.x-plane.com/tools/xptools/). When empty, tools/DSFTool.exe is used,
+  # downloaded from dsftool_url on first use
   dsftool: ""
+  dsftool_url: "https://files.x-plane.com/public/xptools/xptools_win_24-5.zip"
+  # SHA-256 of DSFTool.exe inside that zip; the download is rejected on mismatch (empty skips the check)
+  dsftool_sha256: "42cacb1f988000b9d49b193438f1c79baa96dc35d29ed5a371d423e0650ffbf4"
 
 paths:
   jobs_dir: "jobs"

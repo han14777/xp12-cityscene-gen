@@ -24,6 +24,7 @@ from cityscene import install as installer
 from cityscene import pipeline
 from cityscene.config import Job, dsftool_path, list_jobs, load_settings, save_local, xplane_root
 from cityscene.log import get_logger
+from cityscene.tools_setup import ensure_dsftool
 
 log = get_logger("gui")
 
@@ -219,8 +220,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve(port: int = 8765, open_browser: bool = True) -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{port}/"
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError:
+        # Most likely the UI is already running (e.g. the launcher was double-clicked twice): just show it
+        log.warning("Port %d is in use; opening the UI that is already running", port)
+        if open_browser:
+            webbrowser.open(url)
+        return
+    try:
+        ensure_dsftool(load_settings())
+    except RuntimeError as exc:
+        log.warning("%s", exc)
     log.info("UI running at %s (Ctrl+C to quit)", url)
     if open_browser:
         webbrowser.open(url)

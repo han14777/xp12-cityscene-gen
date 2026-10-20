@@ -8,8 +8,13 @@ __pycache__/
 .venv/
 *.egg-info/
 
-# Machine paths (written by the GUI settings)
+# Machine paths (written by the GUI settings) and the downloaded DSFTool
 config/local.yaml
+tools/
+
+# Release packaging output
+dist/
+packaging/build/
 
 Thumbs.db
 .DS_Store

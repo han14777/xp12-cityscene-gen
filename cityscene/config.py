@@ -9,15 +9,24 @@ import copy
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SETTINGS_PATH = PROJECT_ROOT / "config" / "settings.yaml"
+if getattr(sys, "frozen", False):
+    # Packaged build (PyInstaller): bundled files sit in sys._MEIPASS; jobs, build output, local.yaml and the
+    # downloaded DSFTool go next to the executable
+    BUNDLE_ROOT = Path(sys._MEIPASS)
+    PROJECT_ROOT = Path(sys.executable).resolve().parent
+else:
+    BUNDLE_ROOT = PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SETTINGS_PATH = BUNDLE_ROOT / "config" / "settings.yaml"
 LOCAL_PATH = PROJECT_ROOT / "config" / "local.yaml"
+# Where DSFTool is downloaded to when tools.dsftool is empty
+BUNDLED_DSFTOOL = PROJECT_ROOT / "tools" / "DSFTool.exe"
 
 # Job names become folder names, and pack names appear in Custom Scenery and scenery_packs.ini: keep them plain
 _NAME_RE = re.compile(r"^[A-Za-z0-9_\-]{1,64}$")
@@ -50,6 +59,7 @@ def save_local(values: dict, local_path: Path = LOCAL_PATH) -> None:
     if local_path.exists():
         with open(local_path, encoding="utf-8") as f:
             current = yaml.safe_load(f) or {}
+    local_path.parent.mkdir(parents=True, exist_ok=True)
     with open(local_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(deep_merge(current, values), f, allow_unicode=True, sort_keys=False)
 
@@ -73,8 +83,11 @@ def xplane_root(settings: dict) -> Path | None:
 
 
 def dsftool_path(settings: dict) -> Path | None:
+    """tools.dsftool from settings; when empty, tools/DSFTool.exe (where tools_setup downloads it)."""
     configured = settings.get("tools", {}).get("dsftool")
-    return Path(configured) if configured and Path(configured).is_file() else None
+    if configured:
+        return Path(configured) if Path(configured).is_file() else None
+    return BUNDLED_DSFTOOL if BUNDLED_DSFTOOL.is_file() else None
 
 
 def check_name(name: str) -> str:

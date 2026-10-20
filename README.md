@@ -7,12 +7,23 @@ default autogen buildings inside the area) → linked into Custom Scenery.
 The pipeline is a generalised version of the one built for a Melbourne CBD scenery (melbourne-cbd-xp12).
 City-specific data and hand-made landmark models were left out, so it works for any city.
 
+## Download (Windows)
+
+No Python needed: download `CityScene-<version>-windows-x64.zip` from
+[Releases](https://github.com/han14777/xp12-cityscene-gen/releases/latest), unzip it anywhere you can write to,
+and double-click `CityScene.exe`. The map UI opens in your browser. On first start DSFTool is downloaded from
+Laminar Research (files.x-plane.com, checked against a SHA-256) into the `tools` folder, and X-Plane 12 is
+found automatically. Jobs and generated scenery are kept inside the unzipped folder.
+
+The rest of this README covers running from source.
+
 ## Requirements
 
 - Python 3.11+: `pip install -e ".[dev]"`
 - X-Plane 12 (its location is read automatically from `%LOCALAPPDATA%\x-plane_install_12.txt`)
-- `DSFTool.exe` from Laminar's [XPTools](https://developer.x-plane.com/tools/xptools/); set its path under
-  "Local settings" in the UI (saved to `config/local.yaml`, which is not committed)
+- `DSFTool.exe` from Laminar's [XPTools](https://developer.x-plane.com/tools/xptools/): downloaded automatically
+  into `tools/` on first use, or set your own path under "Local settings" in the UI (saved to `config/local.yaml`,
+  which is not committed)
 
 ## Browser UI
 
@@ -75,6 +86,16 @@ python -m cityscene list
   2 floors
 - Only default buildings are excluded; default roads, trees and ground cover stay
 - Not yet checked in the sim for a real area
+
+## Building a release
+
+```
+pip install pyinstaller
+powershell -ExecutionPolicy Bypass -File packaging/build_release.ps1
+```
+
+This writes `dist/CityScene-<version>-windows-x64.zip`. Pushing a `v*` tag runs the same build on GitHub Actions
+and attaches the zip to a new release.
 
 ## Tests
 

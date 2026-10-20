@@ -27,7 +27,7 @@ import shapely
 from shapely.geometry import Polygon, box, mapping, shape
 from shapely.geometry.polygon import orient
 
-from cityscene.config import dsftool_path
+from cityscene.tools_setup import ensure_dsftool
 from cityscene.dsf_rects import exclusion_rects
 from cityscene.geo import Projector, metric_crs_for, tile_dir, tile_name, tiles_for, zones_union
 from cityscene.log import get_logger
@@ -187,9 +187,7 @@ def verify_dsf(dsftool: Path, dsf_path: Path, expected: dict, roundtrip_path: Pa
 
 
 def run(job, settings: dict) -> dict:
-    dsftool = dsftool_path(settings)
-    if dsftool is None:
-        raise RuntimeError("DSFTool not found; set tools.dsftool in the settings (DSFTool.exe from XPTools)")
+    dsftool = ensure_dsftool(settings)
     processed = job.processed_dir
     path = processed / "buildings_classified.geojson"
     if not path.exists():
