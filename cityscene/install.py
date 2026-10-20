@@ -48,6 +48,10 @@ def ensure_link(link: Path, target: Path) -> str:
     if _is_link(link) or link.exists():
         if _is_link(link) and _same_target(link, target):
             return "exists"
+        if _is_link(link):
+            # Typically installed from another copy of this tool (e.g. a release folder) and then imported here
+            raise RuntimeError(f"{link} is already installed from {link.resolve()}; uninstall it there (or remove "
+                               "that link in Custom Scenery) before installing this copy")
         raise RuntimeError(f"{link} exists and is not a link to {target}; stopped to avoid overwriting it, please check by hand")
     try:
         os.symlink(target, link, target_is_directory=True)

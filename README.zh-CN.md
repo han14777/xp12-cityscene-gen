@@ -36,6 +36,17 @@ python -m cityscene gui        # 或双击 start_gui.bat
 3. 完成后地图上按高度着色显示建筑，鼠标悬停可查看高度来源和 facade 风格
 4. 退出 X-Plane，点击"安装到 X-Plane"
 
+## 导入本工具生成的地景包
+
+每个生成的地景包都在 `<地景包>/cityscene/` 里带着自己的任务（选区、设置、建筑修改、清洗后的 OSM 建筑），
+所以地景包可以重新变回任务：在任务列表下方展开"导入本工具生成的地景包"（会列出 Custom Scenery 和 build
+文件夹里找到的包），或运行 `python -m cityscene import <地景包文件夹>`。导入时复制一份，原包不变。
+导入后可以直接编辑建筑，也可以勾选"重新下载 OSM"再生成，更新数据。
+
+- 如果地景包是本工具另一个副本（比如 release 文件夹）生成的，会把整个任务一起带过来，包括已下载的 OSM 数据
+- 加入这个功能之前生成的旧版地景包，会从 DSF 排除区还原选区；编辑前要先生成一次，下载 OSM
+- 如果这个包是从另一个副本安装的，先在那边卸载，再从这边安装
+
 ## 编辑建筑与自定义模型
 
 生成后在地图上点一栋楼，会打开"编辑建筑"：
@@ -66,6 +77,7 @@ python -m cityscene install sydney_cbd
 python -m cityscene uninstall sydney_cbd
 python -m cityscene list
 python -m cityscene reference sydney_cbd way/123   # 导出一栋楼给 Blender 当参考
+python -m cityscene import "X-Plane 12/Custom Scenery/CityScene_sydney_cbd"   # 地景包 → 任务
 ```
 
 也可以用 `--zone area.geojson` 指定选区（例如在 geojson.io 画好后导出）。
@@ -92,7 +104,7 @@ X-Plane 12 自带 facade 只显示到 8–18 公里（由各 facade 自身设定
 | `config/settings.yaml` | 全局默认：高度规则、清洗阈值、facade 列表、排除类型 |
 | `config/local.yaml` | 本机路径（X-Plane、DSFTool），不进 git |
 | `jobs/<任务>/` | `job.json`、`zone.geojson`、`raw/`（Overpass 缓存）、`processed/`（中间结果和报告）、`overrides.json`（建筑修改）、`models/`（自定义模型）、`build.log` |
-| `build/<地景包>/` | 生成的地景包（`Earth nav data/` 中的 DSF、`objects/impostors/` 中的远景体块），安装时链接到 Custom Scenery |
+| `build/<地景包>/` | 生成的地景包（`Earth nav data/` 中的 DSF，`objects/` 中的远景体块和自定义模型，`cityscene/` 中供重新导入的任务数据），安装时链接到 Custom Scenery |
 
 ## 安装做了什么
 

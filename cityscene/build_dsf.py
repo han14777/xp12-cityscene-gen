@@ -19,7 +19,8 @@ The DSF text follows melbourne-cbd-xp12 pipeline/04_build_dsf.py, all verified i
   facades so they load at any object density
 
 Output: processed/<tile>.dsf.txt, build/<pack>/Earth nav data/<10-degree folder>/<tile>.dsf,
-build/<pack>/objects/impostors/, README.txt, build_report.json
+build/<pack>/objects/impostors/, README.txt, build/<pack>/cityscene/ (the job, for re-importing; transfer.py),
+build_report.json
 """
 
 import json
@@ -34,7 +35,7 @@ from shapely.geometry import Polygon, box, mapping, shape
 from shapely.geometry.polygon import orient
 
 from cityscene.tools_setup import ensure_dsftool
-from cityscene import impostors, overrides
+from cityscene import impostors, overrides, transfer
 from cityscene.dsf_rects import exclusion_rects
 from cityscene.geo import Projector, metric_crs_for, tile_dir, tile_name, tiles_for, zones_union
 from cityscene.log import get_logger
@@ -51,6 +52,9 @@ Data sources:
 - Building footprints and heights: (c) OpenStreetMap contributors, ODbL 1.0
   (https://www.openstreetmap.org/copyright)
 - Facades: X-Plane 12 default library (Laminar Research), no extra download required
+
+The cityscene folder holds the job (area, settings, edits, cleaned OSM buildings) so this pack can be
+imported back into xp12-cityscene-gen, edited and regenerated. X-Plane ignores it.
 """
 
 
@@ -287,6 +291,7 @@ def run(job, settings: dict) -> dict:
     report["roundtrip_verified"] = True
     with open(processed / "build_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
+    transfer.write_job_data(job, build_dir)
     skipped = {k: v for k, v in report.items() if k.startswith("skipped_")}
     log.info("%d blocks -> %d facade polygons; skipped %s; holes dropped %d", len(features), report["polygons"],
              skipped or 0, report.get("holes_dropped", 0))

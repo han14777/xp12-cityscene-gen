@@ -49,6 +49,14 @@
     <label class="check"><input id="force-fetch" type="checkbox"> <span data-i18n="forceFetch"></span></label>
     <button id="build" class="primary" data-i18n="build"></button>
     <label><span data-i18n="existingJobs"></span><select id="jobs"><option value="">—</option></select></label>
+    <details id="import-box">
+      <summary data-i18n="importTitle"></summary>
+      <p class="hint" data-i18n="importHint"></p>
+      <label><span data-i18n="importFound"></span><select id="import-packs"></select></label>
+      <label><span data-i18n="importPath"></span><input id="import-path" placeholder="E:/SteamLibrary/steamapps/common/X-Plane 12/Custom Scenery/CityScene_sydney"></label>
+      <label><span data-i18n="importName"></span><input id="import-name"></label>
+      <button id="import-btn" data-i18n="importBtn"></button>
+    </details>
   </section>
 
   <section id="progress-box" hidden>

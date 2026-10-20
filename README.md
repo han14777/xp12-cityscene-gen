@@ -40,6 +40,20 @@ The UI is in English by default; switch with the EN / 中文 buttons next to the
 3. When done, buildings are shown on the map coloured by height; hover to see the height source and facade style
 4. Quit X-Plane and click "Install to X-Plane"
 
+## Importing a pack made by this tool
+
+Every generated pack carries its job in `<pack>/cityscene/` (area, settings, edits, cleaned OSM buildings), so a
+pack can be turned back into a job: open "Import a scenery pack made by this tool" under the job list (packs found
+in Custom Scenery and the build folder are listed), or run `python -m cityscene import <pack folder>`. The pack is
+copied; the original stays as it is. After importing you can edit buildings right away, or regenerate with
+"Re-download OSM" ticked to refresh the data.
+
+- A pack that is the build output of another copy of this tool (e.g. a release folder) brings the whole job,
+  including the OSM download
+- Packs from versions before this feature get their area back from the DSF exclusion zones; generate once to
+  download OSM before editing
+- If the pack is installed from another copy, uninstall it there before installing from this one
+
 ## Editing buildings and custom models
 
 Click a building on the map (after generating) to open "Edit buildings":
@@ -71,6 +85,7 @@ python -m cityscene install sydney_cbd
 python -m cityscene uninstall sydney_cbd
 python -m cityscene list
 python -m cityscene reference sydney_cbd way/123   # one building as a Wavefront OBJ for Blender
+python -m cityscene import "X-Plane 12/Custom Scenery/CityScene_sydney_cbd"   # pack -> job
 ```
 
 `--zone area.geojson` works too (e.g. drawn and exported from geojson.io).
@@ -98,7 +113,7 @@ it. Larger distances cost some frame rate.
 | `config/settings.yaml` | Global defaults: height rules, cleaning thresholds, facade list, exclusion types |
 | `config/local.yaml` | Machine paths (X-Plane, DSFTool), not committed |
 | `jobs/<job>/` | `job.json`, `zone.geojson`, `raw/` (Overpass cache), `processed/` (intermediate results and reports), `overrides.json` (building edits), `models/` (custom OBJs), `build.log` |
-| `build/<pack>/` | The generated scenery pack (`Earth nav data/` DSFs, `objects/impostors/` distant blocks), linked into Custom Scenery on install |
+| `build/<pack>/` | The generated scenery pack (`Earth nav data/` DSFs, `objects/` distant blocks and custom models, `cityscene/` the job for re-importing), linked into Custom Scenery on install |
 
 ## What install does
 

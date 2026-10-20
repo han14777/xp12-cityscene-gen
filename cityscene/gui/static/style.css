@@ -101,6 +101,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 #edit-title { margin: 0 0 4px; }
 #edit-title small { color: var(--muted); }
 #edit-reference { margin-top: 8px; }
+#import-box { border-top: 0; padding: 4px 0 0; }
+#import-box summary { font-weight: 500; font-size: 13px; color: var(--accent); }
 #edit-count { font-size: 13px; color: var(--muted); }
 .title-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 #lang { display: flex; flex: none; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }

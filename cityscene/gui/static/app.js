@@ -90,6 +90,7 @@ function refreshLanguage() {
   if (currentDetail) render({ ...currentDetail, log: [] });
   if (lastMessage) say(lastMessage.key, lastMessage.vars, lastMessage.kind);
   refreshJobOptions();
+  renderPacks();
   if (buildingsLayer) { map.removeControl(legend); legend.addTo(map); }
   renderEditCount();
   if (selectedId) fillEditForm();
@@ -184,6 +185,48 @@ async function loadJobs(select) {
 }
 
 $("jobs").onchange = (e) => { if (e.target.value) openJob(e.target.value, true); };
+
+// ---------- importing a pack made by this tool ----------
+let packList = [];
+
+async function loadPacks() {
+  try {
+    packList = await api("/api/packs");
+    renderPacks();
+  } catch (e) { sayError(e); }
+}
+
+function renderPacks() {
+  $("import-packs").innerHTML = `<option value="">${esc(packList.length ? t("importPick") : t("importNone"))}</option>` +
+    packList.map((p, i) => `<option value="${i}">${esc(p.folder)} · ${esc(t("source_" + p.source))}${p.kind === "legacy" ? " · " + esc(t("legacyTag")) : ""}</option>`).join("");
+}
+
+$("import-box").addEventListener("toggle", () => { if ($("import-box").open) loadPacks(); });
+
+$("import-packs").onchange = (e) => {
+  const p = packList[e.target.value];
+  if (!p) return;
+  $("import-path").value = p.path;
+  $("import-name").value = p.name;
+};
+
+async function importPack(overwrite) {
+  const path = $("import-path").value.trim();
+  if (!path) return say("importNeedPath", {}, "warn");
+  say("importing", {}, "");
+  try {
+    const r = await api("/api/import", { body: { path, name: $("import-name").value.trim(), overwrite } });
+    await loadJobs(r.name);
+    await openJob(r.name, true);
+    say(r.kind === "legacy" ? "importedLegacy" : "imported", { name: r.name, blocks: r.blocks, edits: r.edits, models: r.models }, "ok");
+    loadPacks();
+  } catch (e) {
+    if (!overwrite && /already exists/.test(e.message) && confirm(t("importConfirmOverwrite", { msg: e.message }))) return importPack(true);
+    sayError(e);
+  }
+}
+
+$("import-btn").onclick = () => importPack(false);
 
 async function openJob(name, fit) {
   currentJob = name;

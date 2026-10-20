@@ -5,6 +5,7 @@
   build <name> [--steps fetch,clean,...] [--force-fetch]
   install <name> / uninstall <name>
   reference <name> <building_id> [-o file.obj]   one building as a Wavefront OBJ for Blender
+  import <pack folder> [--name job] [--overwrite]  turn a scenery pack made by this tool back into a job
   list
 """
 
@@ -53,6 +54,11 @@ def main(argv=None) -> int:
         sub.add_parser(cmd).add_argument("name")
     sub.add_parser("list", help="list jobs")
 
+    p = sub.add_parser("import", help="import a scenery pack made by this tool as a job")
+    p.add_argument("pack", help="scenery pack folder (e.g. in Custom Scenery)")
+    p.add_argument("--name", help="job name (default: the name stored in the pack)")
+    p.add_argument("--overwrite", action="store_true", help="replace an existing job with the same name")
+
     p = sub.add_parser("reference", help="export one building as a Wavefront OBJ to model on in Blender")
     p.add_argument("name")
     p.add_argument("building_id", help="OSM building id, e.g. way/123")
@@ -79,6 +85,12 @@ def main(argv=None) -> int:
         elif args.command == "build":
             steps = args.steps.split(",") if args.steps else None
             pipeline.run(Job.open(args.name, settings), settings, steps, force_fetch=args.force_fetch)
+        elif args.command == "import":
+            from pathlib import Path
+            from cityscene.transfer import import_pack
+            summary = import_pack(Path(args.pack), settings, args.name, overwrite=args.overwrite)
+            print(f"Imported job {summary['name']} ({summary['kind']}): {summary['blocks']} blocks, "
+                  f"{summary['edits']} edits, {summary['models']} models")
         elif args.command == "reference":
             from cityscene.overrides import reference_obj
             job = Job.open(args.name, settings)

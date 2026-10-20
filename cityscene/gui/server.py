@@ -13,6 +13,8 @@ API:
   POST /api/jobs/<name>/overrides       {building_id, edit} store one building's edit (empty edit removes it)
   GET  /api/jobs/<name>/reference?id=   one building as a Wavefront OBJ for Blender (download)
   POST /api/jobs/<name>/install | uninstall
+  GET  /api/packs                       scenery packs made by this tool that can be imported as jobs
+  POST /api/import                      {path, name, overwrite} import a pack as a job
 """
 
 import json
@@ -24,7 +26,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from cityscene import install as installer
-from cityscene import overrides, pipeline
+from cityscene import overrides, pipeline, transfer
 from cityscene.config import Job, dsftool_path, list_jobs, load_settings, save_local, xplane_root
 from cityscene.log import get_logger
 from cityscene.tools_setup import ensure_dsftool
@@ -180,6 +182,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._static(parts[1])
             if parts == ["api", "status"]:
                 return self._json(status())
+            if parts == ["api", "packs"]:
+                return self._json(transfer.find_packs(load_settings()))
             if parts == ["api", "jobs"]:
                 settings = load_settings()
                 jobs = []
@@ -226,6 +230,12 @@ class Handler(BaseHTTPRequestHandler):
                 save_local({"xplane": {"root": body.get("xplane_root", "").strip()},
                             "tools": {"dsftool": body.get("dsftool", "").strip()}})
                 return self._json(status())
+            if parts == ["api", "import"]:
+                if _run_lock.locked():
+                    raise RuntimeError("A job is running; wait for it to finish")
+                return self._json(transfer.import_pack(Path(str(body.get("path") or "").strip().strip('"')), settings,
+                                                       str(body.get("name") or "").strip() or None,
+                                                       overwrite=bool(body.get("overwrite"))))
             if parts == ["api", "jobs"]:
                 job = Job.create(body["name"], body["zone"], settings, body.get("scenery_name") or None,
                                  body.get("options") or {}, overwrite=bool(body.get("overwrite")))
