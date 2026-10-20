@@ -146,7 +146,7 @@ def run(job, settings: dict) -> dict:
     processed = job.processed_dir
     path = processed / "buildings_clean.geojson"
     if not path.exists():
-        raise RuntimeError("没有清洗结果，请先运行 clean")
+        raise RuntimeError("No cleaned buildings; run clean first")
     with open(path, encoding="utf-8") as f:
         features = json.load(f)["features"]
 
@@ -156,8 +156,8 @@ def run(job, settings: dict) -> dict:
     with open(processed / "classify_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
-    log.info("体块 %d；建筑分类 %s；历史建筑 %s", report["blocks"], report["buildings_by_category"],
+    log.info("%d blocks; buildings by category %s; heritage %s", report["blocks"], report["buildings_by_category"],
              report["heritage_buildings"])
-    log.info("facade 风格 %s；退而使用非优先风格 %d，楼层数超出所有 facade 范围 %d",
+    log.info("Facade styles %s; fell back to a non-preferred style %d, floors outside every facade range %d",
              report["blocks_by_style"], report["style_fallback"], report["height_clamped"])
     return report

@@ -79,7 +79,7 @@ def dsftool_path(settings: dict) -> Path | None:
 
 def check_name(name: str) -> str:
     if not _NAME_RE.match(name or ""):
-        raise ValueError(f"名称只能用英文字母、数字、下划线和连字符（1–64 个字符）：{name!r}")
+        raise ValueError(f"Names may only use letters, digits, underscores and hyphens (1-64 characters): {name!r}")
     return name
 
 
@@ -94,7 +94,7 @@ class Job:
     def open(cls, name: str, settings: dict) -> "Job":
         job = cls(check_name(name), project_path(settings["paths"]["jobs_dir"]) / name)
         if not job.meta_path.exists():
-            raise FileNotFoundError(f"任务 {name} 不存在（{job.meta_path}）")
+            raise FileNotFoundError(f"Job {name} does not exist ({job.meta_path})")
         return job
 
     @classmethod
@@ -103,7 +103,7 @@ class Job:
         """zone is GeoJSON (Feature / FeatureCollection / Polygon / MultiPolygon)."""
         job = cls(check_name(name), project_path(settings["paths"]["jobs_dir"]) / name)
         if job.meta_path.exists() and not overwrite:
-            raise FileExistsError(f"任务 {name} 已存在")
+            raise FileExistsError(f"Job {name} already exists")
         job.root.mkdir(parents=True, exist_ok=True)
         meta = job.meta if job.meta_path.exists() else {"created": datetime.now().isoformat(timespec="seconds")}
         meta.update({
@@ -170,7 +170,7 @@ def normalize_zone(zone: dict) -> dict:
             continue
         out.append({"type": "Feature", "properties": {"id": f"zone_{len(out) + 1}"}, "geometry": geometry})
     if not out:
-        raise ValueError("选区中没有多边形")
+        raise ValueError("The area contains no polygons")
     return {"type": "FeatureCollection", "features": out}
 
 

@@ -226,7 +226,7 @@ def _dsftool():
 def test_end_to_end_builds_verified_dsf(tmp_path):
     tool = _dsftool()
     if not tool:
-        pytest.skip("没有 DSFTool")
+        pytest.skip("DSFTool not available")
     settings = make_settings(tmp_path)
     settings["tools"]["dsftool"] = tool
     job = Job.create("e2e", ZONE, settings)
@@ -249,7 +249,7 @@ def test_end_to_end_builds_verified_dsf(tmp_path):
     roundtrip = (job.processed_dir / "-38+144.roundtrip.txt").read_text(encoding="utf-8", errors="replace")
     kinds = {line.split()[1] for line in roundtrip.splitlines() if line.startswith("PROPERTY sim/exclude_")}
     assert kinds == {"sim/exclude_obj", "sim/exclude_fac"}
-    assert (job.root / "build.log").read_text(encoding="utf-8").count("build_dsf 完成") == 1
+    assert (job.root / "build.log").read_text(encoding="utf-8").count("build_dsf finished") == 1
 
     # Output blocks: centroid inside the area, valid geometry, height in (0, 350)
     features = json.loads((job.processed_dir / "buildings_classified.geojson").read_text(encoding="utf-8"))["features"]

@@ -33,7 +33,7 @@ def run(job, base_settings: dict, steps: list | None = None, force_fetch: bool =
     steps = steps or STEPS
     unknown = [s for s in steps if s not in STEPS]
     if unknown:
-        raise ValueError(f"未知步骤 {unknown}，可选 {STEPS}")
+        raise ValueError(f"Unknown steps {unknown}; choose from {STEPS}")
 
     file_handler = logging.FileHandler(job.root / "build.log", mode="a", encoding="utf-8")
     file_handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s %(message)s"))
@@ -46,10 +46,10 @@ def run(job, base_settings: dict, steps: list | None = None, force_fetch: bool =
     reports = {}
     try:
         area = area_km2(job.zones())
-        log.info("任务 %s（地景包 %s），选区 %.2f km²，%s", job.name, job.scenery_name, area,
+        log.info("Job %s (pack %s), area %.2f km², %s", job.name, job.scenery_name, area,
                  datetime.now().isoformat(timespec="seconds"))
         if area > settings["osm"]["max_area_km2"]:
-            raise RuntimeError(f"选区 {area:.0f} km² 超过上限 osm.max_area_km2 = {settings['osm']['max_area_km2']}，请拆小")
+            raise RuntimeError(f"Area {area:.0f} km² exceeds osm.max_area_km2 = {settings['osm']['max_area_km2']}; split it into smaller areas")
         for step in steps:
             if on_step:
                 on_step(step)
@@ -63,9 +63,9 @@ def run(job, base_settings: dict, steps: list | None = None, force_fetch: bool =
                 reports[step] = classify.run(job, settings)
             else:
                 reports[step] = build_dsf.run(job, settings)
-            log.info("%s 完成，用时 %.1f s", step, time.time() - started)
+            log.info("%s finished in %.1f s", step, time.time() - started)
     except Exception as exc:
-        log.error("失败：%s", exc)
+        log.error("Failed: %s", exc)
         raise
     finally:
         for lg in loggers:

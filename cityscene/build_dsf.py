@@ -174,7 +174,7 @@ def summarize_text(text: str) -> dict:
 def run_dsftool(dsftool: Path, *args: str) -> subprocess.CompletedProcess:
     result = subprocess.run([str(dsftool), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
-        raise RuntimeError(f"DSFTool {args[0]} 失败（退出码 {result.returncode}）：\n{result.stdout}\n{result.stderr}")
+        raise RuntimeError(f"DSFTool {args[0]} failed (exit code {result.returncode}):\n{result.stdout}\n{result.stderr}")
     return result
 
 
@@ -183,17 +183,17 @@ def verify_dsf(dsftool: Path, dsf_path: Path, expected: dict, roundtrip_path: Pa
     run_dsftool(dsftool, "--dsf2text", str(dsf_path), str(roundtrip_path))
     actual = summarize_text(roundtrip_path.read_text(encoding="utf-8", errors="replace"))
     if actual != expected:
-        raise RuntimeError(f"DSF 反编译结果与输入不一致：输入 {expected}，反编译 {actual}")
+        raise RuntimeError(f"Decompiled DSF does not match the input: input {expected}, decompiled {actual}")
 
 
 def run(job, settings: dict) -> dict:
     dsftool = dsftool_path(settings)
     if dsftool is None:
-        raise RuntimeError("找不到 DSFTool，请在设置中填写 tools.dsftool（XPTools 中的 DSFTool.exe）")
+        raise RuntimeError("DSFTool not found; set tools.dsftool in the settings (DSFTool.exe from XPTools)")
     processed = job.processed_dir
     path = processed / "buildings_classified.geojson"
     if not path.exists():
-        raise RuntimeError("没有分类结果，请先运行 classify")
+        raise RuntimeError("No classified buildings; run classify first")
     with open(path, encoding="utf-8") as f:
         features = json.load(f)["features"]
 
@@ -222,7 +222,7 @@ def run(job, settings: dict) -> dict:
         verify_dsf(dsftool, dsf_path, summarize_text(text), processed / f"{name}.roundtrip.txt")
         tile_report["dsf_bytes"] = dsf_path.stat().st_size
         report["tiles"][name] = tile_report
-        log.info("瓦片 %s：facade 多边形 %d（%d 种），排除矩形 %d，%d 字节，反编译核对通过", name,
+        log.info("Tile %s: %d facade polygons (%d facades), %d exclusion rectangles, %d bytes, decompile check passed", name,
                  tile_report["polygons"], tile_report["facade_defs"], tile_report["exclusion_rects"],
                  tile_report["dsf_bytes"])
     report["polygons"] = sum(t["polygons"] for t in report["tiles"].values())
@@ -230,7 +230,7 @@ def run(job, settings: dict) -> dict:
     with open(processed / "build_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
     skipped = {k: v for k, v in report.items() if k.startswith("skipped_")}
-    log.info("体块 %d → facade 多边形 %d；跳过 %s；丢弃内环 %d", len(features), report["polygons"],
+    log.info("%d blocks -> %d facade polygons; skipped %s; holes dropped %d", len(features), report["polygons"],
              skipped or 0, report.get("holes_dropped", 0))
-    log.info("地景包：%s", build_dir)
+    log.info("Scenery pack: %s", build_dir)
     return report

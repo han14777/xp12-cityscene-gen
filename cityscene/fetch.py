@@ -67,14 +67,14 @@ def post_overpass(url: str, query: str, timeout_s: int, max_retries: int, backof
                                      timeout=timeout_s + 30)
             if response.status_code == 200:
                 return response.json()
-            log.warning("第 %d 次请求返回 HTTP %d", attempt, response.status_code)
+            log.warning("Attempt %d returned HTTP %d", attempt, response.status_code)
         except (requests.RequestException, ValueError) as exc:
-            log.warning("第 %d 次请求失败：%s", attempt, exc)
+            log.warning("Attempt %d failed: %s", attempt, exc)
         if attempt < max_retries:
             wait = backoff_s * attempt
-            log.info("%.0f 秒后重试", wait)
+            log.info("Retrying in %.0f s", wait)
             time.sleep(wait)
-    raise RuntimeError(f"Overpass 请求 {max_retries} 次均失败，请稍后再试或换 osm.overpass_url")
+    raise RuntimeError(f"Overpass failed {max_retries} times; try again later or change osm.overpass_url")
 
 
 def merge_overpass(datasets: list) -> dict:
@@ -112,7 +112,7 @@ def fetch(job, settings: dict, force: bool = False) -> dict:
     bbox = query_bbox(zones, osm["bbox_buffer_m"])
     cells = chunks(bbox, osm["chunk_deg"])
     job.raw_dir.mkdir(parents=True, exist_ok=True)
-    log.info("外包框 (W,S,E,N) = %s，分 %d 块", tuple(round(v, 5) for v in bbox), len(cells))
+    log.info("Bounding box (W,S,E,N) = %s, %d chunks", tuple(round(v, 5) for v in bbox), len(cells))
 
     files = {}
     for kind in QUERIES:
@@ -123,7 +123,7 @@ def fetch(job, settings: dict, force: bool = False) -> dict:
                 files[kind].append(cached.name)
                 continue
             path = chunk_path(job.raw_dir, kind, swne)
-            log.info("下载 %s 第 %d/%d 块 %s", kind, n, len(cells), swne)
+            log.info("Downloading %s chunk %d/%d %s", kind, n, len(cells), swne)
             query = build_query(kind, swne, osm["request_timeout_s"])
             data = post_overpass(osm["overpass_url"], query, osm["request_timeout_s"],
                                  osm["max_retries"], osm["retry_backoff_s"])
@@ -138,7 +138,7 @@ def fetch(job, settings: dict, force: bool = False) -> dict:
             files[kind].append(path.name)
     (job.raw_dir / "chunks.json").write_text(
         json.dumps({"bbox_wsen": bbox, "chunks": cells, "files": files}, indent=1), encoding="utf-8")
-    log.info("下载完成（缓存于 %s）", job.raw_dir)
+    log.info("Download complete (cached in %s)", job.raw_dir)
     return {kind: len(names) for kind, names in files.items()}
 
 

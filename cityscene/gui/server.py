@@ -44,7 +44,7 @@ def _run_state(name: str) -> dict:
 def _start_build(name: str, force_fetch: bool) -> None:
     if not _run_lock.acquire(blocking=False):
         running = next((n for n, r in _runs.items() if r["state"] == "running"), "?")
-        raise RuntimeError(f"任务 {running} 正在运行，请等它结束")
+        raise RuntimeError(f"Job {running} is running; wait for it to finish")
     state = _run_state(name)
     state.update(state="running", step=None, log=[], error=None)
 
@@ -57,7 +57,7 @@ def _start_build(name: str, force_fetch: bool) -> None:
             state["state"] = "done"
         except Exception as exc:  # background thread: hand the error to the UI
             state.update(state="error", error=str(exc))
-            state["log"].append(f"[gui] 失败：{exc}")
+            state["log"].append(f"[gui] Failed: {exc}")
             log.error("%s", traceback.format_exc())
         finally:
             _run_lock.release()
@@ -221,7 +221,7 @@ class Handler(BaseHTTPRequestHandler):
 def serve(port: int = 8765, open_browser: bool = True) -> None:
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{port}/"
-    log.info("界面已启动：%s（Ctrl+C 退出）", url)
+    log.info("UI running at %s (Ctrl+C to quit)", url)
     if open_browser:
         webbrowser.open(url)
     try:

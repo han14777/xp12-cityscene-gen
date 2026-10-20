@@ -523,10 +523,10 @@ def clean(data: dict, zones: list, settings: dict, roads_data: dict | None = Non
 def run(job, settings: dict) -> dict:
     data = fetch.load(job, "buildings")
     if data is None:
-        raise RuntimeError("没有 OSM 建筑数据，请先运行 fetch")
+        raise RuntimeError("No OSM building data; run fetch first")
     roads_data = fetch.load(job, "roads")
     if roads_data is None:
-        log.warning("没有道路数据，跳过道路冲突检查")
+        log.warning("No road data; skipping the road conflict check")
 
     features, report = clean(data, job.zones(), settings, roads_data)
     out_dir = job.processed_dir
@@ -537,12 +537,12 @@ def run(job, settings: dict) -> dict:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     stats = Counter(report["stats"])
-    log.info("输入建筑 %d，part %d；选区外 %d", stats["input_buildings"], stats["input_parts"], stats["outside_zone"])
+    log.info("Input: %d buildings, %d parts; %d outside the area", stats["input_buildings"], stats["input_parts"], stats["outside_zone"])
     for reason, count in sorted(report["dropped"].items()):
-        log.info("剔除 %-28s %d", reason, count)
-    log.info("道路冲突：机动车道 %d 条；剔除压路体块 %d，切割体块 %d", stats["drivable_roads"],
+        log.info("Dropped %-28s %d", reason, count)
+    log.info("Road conflicts: %d drivable roads; %d blocks on roads dropped, %d blocks cut", stats["drivable_roads"],
              report["dropped"].get("on_road", 0), stats["road_crossed_blocks"])
-    log.info("消除重叠：重叠体块对 %d → %d", stats["overlapping_pairs_before_resolve"], stats["overlapping_pairs"])
-    log.info("输出建筑 %d、体块 %d；高度来源 %s；最高 %.1f m", report["buildings"], report["kept_blocks"],
+    log.info("Overlaps: %d overlapping block pairs -> %d", stats["overlapping_pairs_before_resolve"], stats["overlapping_pairs"])
+    log.info("Output: %d buildings, %d blocks; height sources %s; tallest %.1f m", report["buildings"], report["kept_blocks"],
              report["height_sources"], report["max_height_m"])
     return report
