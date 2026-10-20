@@ -96,8 +96,8 @@ Overpass 服务器繁忙或连不上时，可以在项目设置里把数据来�
 `.osm.pbf` / `.osm` 文件或下载链接：
 
 - [BBBike](https://extract.bbbike.org/)：约 200 个城市的现成文件，也能定制区域。"从 BBBike 获取这片区域…"会打开它的
-  网页并填好所画区域的轮廓；填邮箱（或填 nobody）后点 extract。之后界面每分钟查一次 BBBike 的公开状态页，
-  文件做好后自动填入下载链接（一般 2–7 分钟）。BBBike 个人使用免费，有合理使用限制，靠捐款运营
+  网页并填好所画区域的轮廓；填邮箱（或填 nobody）后点 extract。过几分钟（一般 2–7 分钟）点"查看 BBBike"，
+  界面会读一次 BBBike 的公开状态页，文件做好了就自动填入下载链接。BBBike 个人使用免费，有合理使用限制，靠捐款运营
 - [Geofabrik](https://download.geofabrik.de/)：按国家或州提供，每天更新
 
 文件用 [pyosmium](https://osmcode.org/pyosmium/) 读取，取出选区内的建筑和道路，后面的流程不变。下载链接只下载一次，

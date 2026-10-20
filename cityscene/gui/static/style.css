@@ -131,7 +131,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 #source-box label.check { margin: 4px 0; }
 #source-file-box { margin-top: 6px; }
 #bbbike { margin-top: 8px; }
-#bbbike-track { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; }
+#bbbike-track { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 6px; font-size: 13px; }
+#bbbike-state { flex: 1 1 100%; }
 #bbbike-track button { padding: 3px 9px; font-size: 12px; }
 #bbbike-state.ok { color: var(--ok); }
 #bbbike-state.warn { color: var(--warn); }

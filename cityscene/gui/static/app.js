@@ -177,7 +177,7 @@ function refreshLanguage() {
   if (selectedId) fillEditForm();
   updatePanelToggle();
   renderServers();
-  if (lastBbbike) showBbbike(lastBbbike.key, lastBbbike.cls);
+  if (lastBbbike) showBbbike(lastBbbike.key, lastBbbike.cls, lastBbbike.vars);
 }
 
 document.querySelectorAll("#lang button").forEach((b) => {
@@ -354,37 +354,38 @@ document.querySelectorAll('input[name="source"]').forEach((r) => {
   r.onchange = () => { $("source-file-box").hidden = sourceType() !== "file"; };
 });
 
-// BBBike: open its extract form with the area's polygon filled in (the user submits it there), then follow BBBike's
-// public status page once a minute until the file is ready and put its link in the data source field.
-// The request is remembered in this browser, so tracking resumes after a reload.
-const BBBIKE_POLL_MS = 60000;
-const BBBIKE_GIVE_UP_MS = 2 * 3600 * 1000;
-let bbbikeTimer = null;
-
-function bbbikeRequest() {
-  try { return JSON.parse(store.get("cityscene.bbbike") || "null"); } catch (e) { return null; }
-}
-
+// BBBike: open its extract form with the area's polygon filled in (the user submits it there). The user then clicks
+// "Check BBBike" whenever they like; that reads BBBike's public status page once and, when the file is ready, puts its
+// link in the data source field. The request is remembered in this browser (BBBike's page lists the last 24 hours).
+const BBBIKE_KEEP_MS = 24 * 3600 * 1000;
 let lastBbbike = null;
 
-function showBbbike(key, cls = "") {
-  lastBbbike = key ? { key, cls } : null;
+function bbbikeRequest() {
+  let req = null;
+  try { req = JSON.parse(store.get("cityscene.bbbike") || "null"); } catch (e) { req = null; }
+  return req && Date.now() - req.started < BBBIKE_KEEP_MS ? req : null;
+}
+
+function showBbbike(key, cls = "", vars = {}) {
+  lastBbbike = key ? { key, cls, vars } : null;
   $("bbbike-track").hidden = !key;
-  $("bbbike-state").textContent = key ? t(key, { name: bbbikeRequest()?.name || "" }) : "";
+  $("bbbike-state").textContent = key ? t(key, { name: bbbikeRequest()?.name || vars.name || "", ...vars }) : "";
   $("bbbike-state").className = cls;
+  $("bbbike-check").hidden = !bbbikeRequest();
+  $("bbbike-stop").hidden = !bbbikeRequest();
 }
 
 function stopBbbike() {
-  clearTimeout(bbbikeTimer);
   store.set("cityscene.bbbike", "null");
   showBbbike(null);
 }
 
-async function pollBbbike() {
-  clearTimeout(bbbikeTimer);
+async function checkBbbike() {
   const req = bbbikeRequest();
   if (!req) return showBbbike(null);
-  if (Date.now() - req.started > BBBIKE_GIVE_UP_MS) { showBbbike("bbbikeGaveUp", "warn"); store.set("cityscene.bbbike", "null"); return; }
+  $("bbbike-check").disabled = true;
+  showBbbike("bbbikeChecking");
+  const time = new Date().toLocaleTimeString();
   try {
     const s = await api(`/api/bbbike/status?name=${encodeURIComponent(req.name)}`);
     if (s.state === "ready") {
@@ -392,15 +393,17 @@ async function pollBbbike() {
       $("source-file-box").hidden = false;
       $("source-file").value = s.link;
       store.set("cityscene.bbbike", "null");
-      showBbbike("bbbikeReady", "ok");
+      showBbbike("bbbikeReady", "ok", { name: req.name });
       say("bbbikeReadyMsg", {}, "ok");
       return;
     }
-    showBbbike(s.state === "not_found" ? "bbbikeNotYet" : s.state === "running" ? "bbbikeRunning" : "bbbikeWaiting");
+    const key = s.state === "running" ? "bbbikeRunning" : s.state === "waiting" ? "bbbikeWaiting" : "bbbikeNotYet";
+    showBbbike(key, s.state === "not_found" ? "warn" : "", { time });
   } catch (e) {
-    showBbbike("bbbikeCheckFailed", "warn");
+    showBbbike("bbbikeCheckFailed", "warn", { time });
+  } finally {
+    $("bbbike-check").disabled = false;
   }
-  bbbikeTimer = setTimeout(pollBbbike, BBBIKE_POLL_MS);
 }
 
 $("bbbike").onclick = async () => {
@@ -415,14 +418,14 @@ $("bbbike").onclick = async () => {
     if (tab) tab.location = r.url; else window.open(r.url, "_blank");
     store.set("cityscene.bbbike", JSON.stringify({ name: r.name, started: Date.now() }));
     say("bbbikeOpened", {}, "ok");
-    showBbbike("bbbikeNotYet");
-    bbbikeTimer = setTimeout(pollBbbike, BBBIKE_POLL_MS);
+    showBbbike("bbbikeSent");
   } catch (e) {
     if (tab) tab.close();
     sayError(e);
   }
 };
 
+$("bbbike-check").onclick = checkBbbike;
 $("bbbike-stop").onclick = stopBbbike;
 
 $("job-name").addEventListener("input", (e) => {
@@ -868,4 +871,4 @@ addDrawControl();
 updateArea();
 loadStatus().catch(sayError);
 showTab(startTab);
-if (bbbikeRequest()) { $("source-file-box").hidden = false; pollBbbike(); }
+if (bbbikeRequest()) { $("source-file-box").hidden = false; showBbbike("bbbikeSent"); }

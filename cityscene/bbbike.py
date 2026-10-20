@@ -1,5 +1,5 @@
-"""BBBike extract helper (extract.bbbike.org): open the request form with the area filled in, then follow the
-public status page until the file is ready.
+"""BBBike extract helper (extract.bbbike.org): open the request form with the area filled in, then (when the user
+asks) look the request up on the public status page.
 
 BBBike has no API for submitting extracts and asks for fair use, so the user submits the form in the browser
 (e-mail, or "nobody" to skip the e-mail and use the status page). This module only builds the form link and reads

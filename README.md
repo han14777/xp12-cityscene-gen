@@ -106,8 +106,8 @@ the project settings and give a local `.osm.pbf` / `.osm` file or a download lin
 
 - [BBBike](https://extract.bbbike.org/): ready-made files for about 200 cities, or a custom area. "Get this area from
   BBBike…" opens its page with the outline of the drawn area filled in; enter your e-mail (or "nobody") and press
-  extract. The UI then checks BBBike's public status page once a minute and fills in the download link when the
-  file is ready (usually 2–7 minutes). BBBike is free for personal use under a fair-use policy and runs on donations
+  extract. After a few minutes (usually 2–7) click "Check BBBike": the UI reads BBBike's public status page once and
+  fills in the download link when the file is ready. BBBike is free for personal use under a fair-use policy and runs on donations
 - [Geofabrik](https://download.geofabrik.de/): files per country or state, updated daily
 
 The file is read with [pyosmium](https://osmcode.org/pyosmium/); the buildings and roads in the area are taken out
