@@ -1,4 +1,5 @@
-// Browser map UI: draw an area -> save the job and generate in the background -> poll progress -> preview buildings -> install.
+// Browser map UI: draw an area -> save the job and generate in the background -> poll progress -> preview buildings
+// -> edit single buildings (height / style / delete / custom model) -> install.
 // UI text lives in i18n.js.
 "use strict";
 
@@ -22,6 +23,12 @@ let pollTimer = null;
 let buildingsLayer = null;
 let lastStatus = null;
 let lastMessage = null;
+// Per-building edits (jobs/<name>/overrides.json), OBJ files in the job's models folder, the selected building
+let edits = {};
+let modelFiles = [];
+let modelsDir = "";
+let selectedId = null;
+const EDIT_COLORS = { edit: "#0b9e9e", delete: "#8a8f98", model: "#7b3fb5" };
 
 // ---------- map ----------
 const map = L.map("map", { zoomControl: true }).setView([-37.8136, 144.9631], 13);
@@ -55,7 +62,8 @@ map.on(L.Draw.Event.DELETED, updateArea);
 const legend = L.control({ position: "bottomright" });
 legend.onAdd = () => {
   const div = L.DomUtil.create("div", "legend");
-  div.innerHTML = HEIGHT_BANDS.map(([, c, label]) => `<i style="background:${c}"></i>${label}`).join("<br>");
+  div.innerHTML = HEIGHT_BANDS.map(([, c, label]) => `<i style="background:${c}"></i>${label}`).join("<br>") +
+    "<hr>" + ["edit", "delete", "model"].map((k) => `<i class="${k}" style="border-color:${EDIT_COLORS[k]}"></i>${t("legend_" + k)}`).join("<br>");
   return div;
 };
 
@@ -82,6 +90,9 @@ function refreshLanguage() {
   if (currentDetail) render({ ...currentDetail, log: [] });
   if (lastMessage) say(lastMessage.key, lastMessage.vars, lastMessage.kind);
   refreshJobOptions();
+  if (buildingsLayer) { map.removeControl(legend); legend.addTo(map); }
+  renderEditCount();
+  if (selectedId) fillEditForm();
 }
 
 document.querySelectorAll("#lang button").forEach((b) => {
@@ -176,6 +187,8 @@ $("jobs").onchange = (e) => { if (e.target.value) openJob(e.target.value, true);
 
 async function openJob(name, fit) {
   currentJob = name;
+  selectedId = null;
+  $("edit-form").hidden = true;
   logSince = 0;
   $("log").textContent = "";
   const d = await api(`/api/jobs/${name}`);
@@ -258,6 +271,7 @@ function render(d) {
     else if (i === at) li.className = d.run.state === "error" ? "failed" : "active";
   });
   $("result-box").hidden = !d.built || running;
+  $("edit-box").hidden = !d.built || running;
   $("install").disabled = d.installed;
   $("uninstall").disabled = !d.installed;
   const c = d.reports.clean, k = d.reports.classify, b = d.reports.build;
@@ -282,15 +296,49 @@ function heightColor(h) {
   return color;
 }
 
+function editKind(e) {
+  if (!e) return null;
+  if (e.delete) return "delete";
+  if (e.model) return "model";
+  return "edit";
+}
+
+function buildingStyle(f) {
+  const p = f.properties;
+  const kind = editKind(edits[p.building_id]);
+  const style = { color: heightColor(p.height_m), fillColor: heightColor(p.height_m), weight: 0.6, fillOpacity: 0.65, dashArray: null };
+  if (kind === "edit") Object.assign(style, { color: EDIT_COLORS.edit, weight: 2.5 });
+  if (kind === "delete") Object.assign(style, { color: EDIT_COLORS.delete, fillOpacity: 0.08, weight: 1, dashArray: "3 3" });
+  if (kind === "model") Object.assign(style, { color: EDIT_COLORS.model, fillColor: EDIT_COLORS.model, weight: 1.5, fillOpacity: 0.7 });
+  if (p.building_id === selectedId) Object.assign(style, { color: "#f2c200", weight: 3 });
+  return style;
+}
+
+async function loadEdits() {
+  const o = await api(`/api/jobs/${currentJob}/overrides`);
+  edits = o.buildings;
+  modelFiles = o.models;
+  modelsDir = o.models_dir;
+  $("model-files").innerHTML = modelFiles.map((m) => `<option value="${esc(m)}">`).join("");
+  renderEditCount();
+}
+
 async function loadBuildings() {
   if (buildingsLayer) { map.removeLayer(buildingsLayer); buildingsLayer = null; }
-  if (!$("show-buildings").checked || !currentJob) { map.removeControl(legend); return; }
+  if (!currentJob) return;
+  await loadEdits();
+  if (!$("show-buildings").checked) { map.removeControl(legend); return; }
   const data = await api(`/api/jobs/${currentJob}/buildings`);
   buildingsLayer = L.geoJSON(data, {
-    style: (f) => ({ color: heightColor(f.properties.height_m), weight: 0.6, fillOpacity: 0.65 }),
+    style: buildingStyle,
     onEachFeature: (f, layer) => {
       const p = f.properties;
-      layer.bindTooltip(`${p.name ? esc(p.name) + "<br>" : ""}${p.height_m} m (${esc(p.height_source)})<br>${esc(p.facade_style)}`);
+      layer.bindTooltip(() => {
+        const kind = editKind(edits[p.building_id]);
+        return `${p.name ? esc(p.name) + "<br>" : ""}${p.height_m} m (${esc(p.height_source)})<br>${esc(p.facade_style)}` +
+          (kind ? `<br><b>${esc(t("legend_" + kind))}</b>` : "");
+      });
+      layer.on("click", (e) => { L.DomEvent.stopPropagation(e); selectBuilding(p.building_id); });
     },
   }).addTo(map);
   legend.addTo(map);
@@ -298,6 +346,107 @@ async function loadBuildings() {
 }
 
 $("show-buildings").onchange = loadBuildings;
+
+// ---------- editing single buildings ----------
+function selectedBlocks() {
+  const blocks = [];
+  if (buildingsLayer) buildingsLayer.eachLayer((l) => { if (l.feature.properties.building_id === selectedId) blocks.push(l.feature.properties); });
+  return blocks;
+}
+
+function selectBuilding(id) {
+  selectedId = id;
+  if (buildingsLayer) buildingsLayer.setStyle(buildingStyle);
+  $("edit-form").hidden = false;
+  fillEditForm();
+}
+
+function fillEditForm() {
+  const blocks = selectedBlocks();
+  const tallest = blocks.length ? Math.max(...blocks.map((b) => b.height_m)) : 0;
+  const name = blocks.find((b) => b.name)?.name;
+  const osm = selectedId.match(/^(way|relation)\/(\d+)/);
+  const link = osm ? `<a href="https://www.openstreetmap.org/${osm[1]}/${osm[2]}" target="_blank" rel="noopener">${esc(selectedId)}</a>` : esc(selectedId);
+  $("edit-title").innerHTML = `<b>${esc(name || t("unnamed"))}</b> <small>${link}</small><br>` +
+    `<small>${esc(t("editCurrent", { h: tallest, n: blocks.length, style: blocks[0]?.facade_style ?? "?" }))}</small>`;
+  const e = edits[selectedId] || {};
+  const kind = editKind(e) || "keep";
+  $("edit-action").value = kind === "edit" ? "keep" : kind;
+  $("edit-height").value = e.height_m ?? "";
+  $("edit-height").placeholder = tallest;
+  $("edit-style").value = e.style ?? "";
+  $("edit-model-path").value = e.model?.path ?? "";
+  $("edit-heading").value = e.model?.heading ?? 0;
+  $("edit-east").value = e.model?.offset_e_m ?? 0;
+  $("edit-north").value = e.model?.offset_n_m ?? 0;
+  $("models-hint").textContent = t("modelsHint", { dir: modelsDir, n: modelFiles.length });
+  showActionFields();
+}
+
+function showActionFields() {
+  const action = $("edit-action").value;
+  $("edit-keep").hidden = action !== "keep";
+  $("edit-model").hidden = action !== "model";
+}
+
+$("edit-action").onchange = showActionFields;
+
+function renderEditCount() {
+  const counts = { edit: 0, delete: 0, model: 0 };
+  for (const e of Object.values(edits)) counts[editKind(e)]++;
+  const total = counts.edit + counts.delete + counts.model;
+  $("edit-count").textContent = total ? t("editCount", { total, ...counts }) : t("noEdits");
+}
+
+async function saveEdit(edit) {
+  try {
+    const r = await api(`/api/jobs/${currentJob}/overrides`, { body: { building_id: selectedId, edit } });
+    edits = r.buildings;
+    if (buildingsLayer) buildingsLayer.setStyle(buildingStyle);
+    renderEditCount();
+    fillEditForm();
+    say("editSaved", {}, "ok");
+  } catch (e) { sayError(e); }
+}
+
+$("edit-save").onclick = () => {
+  const action = $("edit-action").value;
+  if (action === "delete") return saveEdit({ delete: true });
+  if (action === "model") {
+    const path = $("edit-model-path").value.trim().replace(/\\/g, "/");
+    // Not in the models folder: it can only be a library path, so make sure that is meant
+    if (path && !modelFiles.includes(path) && !confirm(t("confirmLibraryPath", { path }))) return;
+    return saveEdit({ model: {
+      path, heading: parseFloat($("edit-heading").value) || 0,
+      offset_e_m: parseFloat($("edit-east").value) || 0, offset_n_m: parseFloat($("edit-north").value) || 0,
+    } });
+  }
+  return saveEdit({ height_m: $("edit-height").value || null, style: $("edit-style").value || null });
+};
+
+$("edit-reset").onclick = () => saveEdit(null);
+
+$("edit-reference").onclick = async () => {
+  try {
+    const res = await fetch(`/api/jobs/${currentJob}/reference?id=${encodeURIComponent(selectedId)}`);
+    if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = selectedId.replace(/[^\w#-]/g, "_") + "_reference.obj";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) { sayError(e); }
+};
+
+$("apply-edits").onclick = async () => {
+  try {
+    logSince = 0;
+    $("log").textContent = "";
+    await api(`/api/jobs/${currentJob}/build`, { body: { steps: ["classify", "build_dsf"] } });
+    say("started", {}, "ok");
+    startPolling();
+  } catch (e) { sayError(e); }
+};
 
 $("install").onclick = async () => {
   try {

@@ -36,10 +36,10 @@ def test_groups_by_cell_and_lod_with_lod_band(tmp_path):
     ]
     placements, stats = impostors.build_impostors("-38+144", polygons, SETTINGS, out, PROJ)
     assert stats["impostor_objects"] == len(placements) == 3
-    assert all(path.startswith("objects/impostors/") for path, _, _ in placements)
+    assert all(path.startswith("objects/impostors/") for path, *_ in placements)
     overlap = SETTINGS["dsf"]["impostors"]["overlap_m"]
     far = SETTINGS["dsf"]["render_distance_km"] * 1000
-    lods = sorted(read_obj8(tmp_path / "pack" / path)["lods"][1] for path, _, _ in placements)
+    lods = sorted(read_obj8(tmp_path / "pack" / path)["lods"][1] for path, *_ in placements)
     assert lods == [(10000 - overlap, far), (10000 - overlap, far), (18000 - overlap, far)]
 
 

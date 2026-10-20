@@ -4,6 +4,7 @@
   new <name> (--bbox W,S,E,N | --zone file.geojson) [--scenery pack] [--default-height 12] [--render-distance 30]
   build <name> [--steps fetch,clean,...] [--force-fetch]
   install <name> / uninstall <name>
+  reference <name> <building_id> [-o file.obj]   one building as a Wavefront OBJ for Blender
   list
 """
 
@@ -52,6 +53,11 @@ def main(argv=None) -> int:
         sub.add_parser(cmd).add_argument("name")
     sub.add_parser("list", help="list jobs")
 
+    p = sub.add_parser("reference", help="export one building as a Wavefront OBJ to model on in Blender")
+    p.add_argument("name")
+    p.add_argument("building_id", help="OSM building id, e.g. way/123")
+    p.add_argument("-o", "--output", help="output file (default <building>_reference.obj)")
+
     args = parser.parse_args(argv)
     settings = load_settings()
 
@@ -73,6 +79,15 @@ def main(argv=None) -> int:
         elif args.command == "build":
             steps = args.steps.split(",") if args.steps else None
             pipeline.run(Job.open(args.name, settings), settings, steps, force_fetch=args.force_fetch)
+        elif args.command == "reference":
+            from cityscene.overrides import reference_obj
+            job = Job.open(args.name, settings)
+            with open(job.processed_dir / "buildings_classified.geojson", encoding="utf-8") as f:
+                features = json.load(f)["features"]
+            out = args.output or f"{args.building_id.replace('/', '_')}_reference.obj"
+            with open(out, "w", encoding="utf-8") as f:
+                f.write(reference_obj(features, args.building_id))
+            print(f"Wrote {out}")
         elif args.command == "install":
             installer.install(Job.open(args.name, settings), settings)
         elif args.command == "uninstall":

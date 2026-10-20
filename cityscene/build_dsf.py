@@ -11,6 +11,9 @@ The DSF text follows melbourne-cbd-xp12 pipeline/04_build_dsf.py, all verified i
 - Facades cannot have holes: blocks with courtyards are cut along vertical lines through each hole
   (split_holes), otherwise the courtyard would be filled in
 - Blocks go to the tile containing their centroid; blocks with vertices outside that tile are skipped and counted
+- Buildings edited to delete or to a custom model (overrides.py) get no facade or distant block; a model is
+  placed with OBJECT at the building origin plus its offset and heading. Models from jobs/<name>/models/ are copied
+  to objects/models/ in the pack (the whole folder, so textures come along); library paths are used as given
 - Distant blocks (impostors.py) beyond the facades' LOD up to dsf.render_distance_km: OBJECT_DEF <path relative to
   the pack root>, OBJECT <index> <lon> <lat> <heading> (README.dsf2text), with sim/require_object 1/0 like the
   facades so they load at any object density
@@ -31,7 +34,7 @@ from shapely.geometry import Polygon, box, mapping, shape
 from shapely.geometry.polygon import orient
 
 from cityscene.tools_setup import ensure_dsftool
-from cityscene import impostors
+from cityscene import impostors, overrides
 from cityscene.dsf_rects import exclusion_rects
 from cityscene.geo import Projector, metric_crs_for, tile_dir, tile_name, tiles_for, zones_union
 from cityscene.log import get_logger
@@ -88,11 +91,20 @@ def split_holes(geom) -> list:
     return out
 
 
-def prepare_polygons(features: list, projector: Projector) -> tuple[dict, Counter]:
-    """Returns ({(lat, lon): [(facade, height, [(lon, lat)])]}, stats)."""
+def prepare_polygons(features: list, projector: Projector, edits: dict | None = None) -> tuple[dict, Counter]:
+    """Returns ({(lat, lon): [(facade, height, [(lon, lat)])]}, stats). Blocks of buildings edited to delete or to a
+    model are left out."""
     by_tile, stats = defaultdict(list), Counter()
+    edits = edits or {}
     for feature in features:
         p = feature["properties"]
+        kind = overrides.edit_kind(edits.get(p["building_id"]))
+        if kind == "delete":
+            stats["blocks_deleted"] += 1
+            continue
+        if kind == "model":
+            stats["blocks_replaced_by_model"] += 1
+            continue
         polygon_m = projector.to_metric(shape(feature["geometry"]))
         pieces = [polygon_m]
         if any(len(g.interiors) for g in getattr(polygon_m, "geoms", [polygon_m])):
@@ -120,7 +132,7 @@ def _add_piece(polygon_m, p: dict, projector: Projector, by_tile: dict, stats: C
 
 def build_text(tile: tuple, polygons: list, zones: list, settings: dict, objects: list = ()) -> tuple[str, dict]:
     """DSF text for one tile. zones are the area Features; only their part inside this tile becomes exclusions.
-    objects: [(object path relative to the pack root, lon, lat)], placed with heading 0."""
+    objects: [(object path relative to the pack root, lon, lat, heading)]."""
     lat, lon = tile
     tile_box = box(lon, lat, lon + 1, lat + 1)
     lines = [
@@ -151,7 +163,7 @@ def build_text(tile: tuple, polygons: list, zones: list, settings: dict, objects
     lines.append("")
 
     object_index: dict[str, int] = {}
-    for path, _, _ in objects:
+    for path, *_ in objects:
         object_index.setdefault(path, len(object_index))
     facade_index: dict[str, int] = {}
     for facade, _, _ in polygons:
@@ -159,8 +171,8 @@ def build_text(tile: tuple, polygons: list, zones: list, settings: dict, objects
     lines += [f"OBJECT_DEF {path}" for path in object_index]
     lines += [f"POLYGON_DEF {path}" for path in facade_index]
     lines.append("")
-    for path, lon_, lat_ in objects:
-        lines.append(f"OBJECT {object_index[path]} {lon_:.9f} {lat_:.9f} 0")
+    for path, lon_, lat_, heading in objects:
+        lines.append(f"OBJECT {object_index[path]} {lon_:.9f} {lat_:.9f} {heading:g}")
     for facade, height, lonlat in polygons:
         lines.append(f"BEGIN_POLYGON {facade_index[facade]} {max(1, round(height))} 2")
         lines.append("BEGIN_WINDING")
@@ -200,6 +212,23 @@ def verify_dsf(dsftool: Path, dsf_path: Path, expected: dict, roundtrip_path: Pa
         raise RuntimeError(f"Decompiled DSF does not match the input: input {expected}, decompiled {actual}")
 
 
+def place_models(features: list, edits: dict, job) -> dict:
+    """{tile: [(object path relative to the pack root, lon, lat, heading)]} for buildings edited to a custom model."""
+    wanted = {bid: e["model"] for bid, e in edits.items() if overrides.edit_kind(e) == "model"}
+    origins = overrides.building_origins([f for f in features if f["properties"]["building_id"] in wanted])
+    out = defaultdict(list)
+    for building_id, origin in origins.items():
+        model = wanted[building_id]
+        lon, lat = overrides.offset_lonlat(*origin, model["offset_e_m"], model["offset_n_m"])
+        path = model["path"]
+        if overrides.model_is_local(job, path):
+            path = f"objects/models/{path}"
+        elif path.startswith(("objects/", "models/")):
+            raise RuntimeError(f"Model {model['path']} for {building_id} not found in {job.models_dir}")
+        out[(math.floor(lat), math.floor(lon))].append((path, lon, lat, model["heading"]))
+    return out
+
+
 def run(job, settings: dict) -> dict:
     dsftool = ensure_dsftool(settings)
     processed = job.processed_dir
@@ -211,17 +240,22 @@ def run(job, settings: dict) -> dict:
 
     zones = job.zones()
     projector = Projector(metric_crs_for(zones))
-    by_tile, stats = prepare_polygons(features, projector)
+    edits = overrides.load(job)
+    by_tile, stats = prepare_polygons(features, projector, edits)
+    models = place_models(features, edits, job)
     # Exclusions cover the whole area, so tiles without buildings are written too (to clear default autogen)
-    tiles = sorted(set(tiles_for(zones_union(zones))) | set(by_tile))
+    tiles = sorted(set(tiles_for(zones_union(zones))) | set(by_tile) | set(models))
 
     build_dir = job.build_dir(settings)
     earth = build_dir / "Earth nav data"
     impostor_dir = build_dir / "objects" / "impostors"
-    for old_output in (earth, impostor_dir):
+    models_dir = build_dir / "objects" / "models"
+    for old_output in (earth, impostor_dir, models_dir):
         if old_output.exists():
             shutil.rmtree(old_output)
     build_dir.mkdir(parents=True, exist_ok=True)
+    if any(path.startswith("objects/models/") for placed in models.values() for path, *_ in placed):
+        shutil.copytree(job.models_dir, models_dir)
     impostors.write_atlas(impostor_dir)
     (build_dir / "README.txt").write_text(ATTRIBUTION.format(name=job.scenery_name), encoding="utf-8")
 
@@ -229,8 +263,8 @@ def run(job, settings: dict) -> dict:
     for tile in tiles:
         name = tile_name(*tile)
         objects, imp_stats = impostors.build_impostors(name, by_tile.get(tile, []), settings, impostor_dir, projector)
-        text, tile_report = build_text(tile, by_tile.get(tile, []), zones, settings, objects)
-        tile_report.update(imp_stats)
+        text, tile_report = build_text(tile, by_tile.get(tile, []), zones, settings, models.get(tile, []) + objects)
+        tile_report.update(imp_stats, models=len(models.get(tile, [])))
         text_path = processed / f"{name}.dsf.txt"
         text_path.write_text(text, encoding="utf-8", newline="\n")
         dsf_path = earth / tile_dir(*tile) / f"{name}.dsf"
@@ -244,18 +278,21 @@ def run(job, settings: dict) -> dict:
                  tile_report["dsf_bytes"])
     report["polygons"] = sum(t["polygons"] for t in report["tiles"].values())
     report["render_distance_km"] = settings["dsf"]["render_distance_km"]
-    for key in ("impostor_objects", "impostor_triangles"):
+    for key in ("impostor_objects", "impostor_triangles", "models"):
         report[key] = sum(t[key] for t in report["tiles"].values())
     if not report["impostor_objects"]:
         shutil.rmtree(impostor_dir)
-        if not any(impostor_dir.parent.iterdir()):
-            impostor_dir.parent.rmdir()
+    if impostor_dir.parent.is_dir() and not any(impostor_dir.parent.iterdir()):
+        impostor_dir.parent.rmdir()
     report["roundtrip_verified"] = True
     with open(processed / "build_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
     skipped = {k: v for k, v in report.items() if k.startswith("skipped_")}
     log.info("%d blocks -> %d facade polygons; skipped %s; holes dropped %d", len(features), report["polygons"],
              skipped or 0, report.get("holes_dropped", 0))
+    if report["models"] or report.get("blocks_deleted"):
+        log.info("Edits: %d custom models placed, %d blocks replaced by models, %d blocks deleted", report["models"],
+                 report.get("blocks_replaced_by_model", 0), report.get("blocks_deleted", 0))
     log.info("Render distance %g km: %d distant-block objects, %d triangles", report["render_distance_km"],
              report["impostor_objects"], report["impostor_triangles"])
     log.info("Scenery pack: %s", build_dir)

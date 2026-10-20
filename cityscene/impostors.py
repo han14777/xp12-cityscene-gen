@@ -139,7 +139,7 @@ def facade_info(settings: dict) -> dict:
 
 def build_impostors(tile_name: str, polygons: list, settings: dict, out_dir: Path, projector) -> tuple[list, dict]:
     """polygons: [(facade path, height m, [(lon, lat)])] of one tile. Writes OBJs to out_dir and returns
-    ([(object path relative to the pack root, lon, lat)], stats)."""
+    ([(object path relative to the pack root, lon, lat, heading)], stats)."""
     dsf = settings["dsf"]
     far_m = dsf["render_distance_km"] * 1000
     imp = dsf["impostors"]
@@ -174,6 +174,6 @@ def build_impostors(tile_name: str, polygons: list, settings: dict, out_dir: Pat
         near_m = max(1, lod_m - imp["overlap_m"])
         write_obj8(out_dir / name, mesh, ATLAS_NAME, ATLAS_LIT_NAME, lod_far_m=far_m, lod_near_m=near_m,
                    comments=[f"xp12-cityscene-gen distant blocks: {len(members)} blocks, cell {i},{j}"])
-        placements.append((f"{rel_dir}/{name}", lon0, lat0))
+        placements.append((f"{rel_dir}/{name}", lon0, lat0, 0))
         triangles += main_tris
     return placements, {"impostor_objects": len(placements), "impostor_triangles": triangles}

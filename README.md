@@ -40,6 +40,27 @@ The UI is in English by default; switch with the EN / 中文 buttons next to the
 3. When done, buildings are shown on the map coloured by height; hover to see the height source and facade style
 4. Quit X-Plane and click "Install to X-Plane"
 
+## Editing buildings and custom models
+
+Click a building on the map (after generating) to open "Edit buildings":
+
+- **Keep**, optionally with a new height (the tallest part; other parts scale with it) or a facade style
+- **Delete** it
+- **Replace with my model**: an OBJ placed at the building's centre, with heading and east / north offset
+
+Edits are saved per OSM building in `jobs/<job>/overrides.json`, so re-downloading OSM or regenerating keeps them.
+Click "Apply edits" to regenerate (classify + build_dsf only, no download).
+
+For a custom model, put the `.obj` and its textures in `jobs/<job>/models/` (subfolders are fine) and enter the path
+relative to that folder, e.g. `eureka/eureka.obj`; the whole folder is copied into the pack. An X-Plane library path
+(e.g. `lib/...`) also works. The replaced building gets no facade or distant block.
+
+To model a building in Blender: click "Download reference for Blender" (or
+`python -m cityscene reference <job> way/123`) and import the file with File → Import → Wavefront (.obj) using the
+default axes. It is the building's blocks around its placement point. Build on top of it and export with
+[XPlane2Blender](https://github.com/X-Plane/XPlane2Blender); with heading 0 and no offset the model lines up with the
+map. Models can also come from SketchUp or AC3D exporters, or be generated in code.
+
 ## Command line
 
 ```
@@ -49,6 +70,7 @@ python -m cityscene build sydney_cbd --steps clean,classify,build_dsf   # after 
 python -m cityscene install sydney_cbd
 python -m cityscene uninstall sydney_cbd
 python -m cityscene list
+python -m cityscene reference sydney_cbd way/123   # one building as a Wavefront OBJ for Blender
 ```
 
 `--zone area.geojson` works too (e.g. drawn and exported from geojson.io).
@@ -75,7 +97,7 @@ it. Larger distances cost some frame rate.
 |------|----------|
 | `config/settings.yaml` | Global defaults: height rules, cleaning thresholds, facade list, exclusion types |
 | `config/local.yaml` | Machine paths (X-Plane, DSFTool), not committed |
-| `jobs/<job>/` | `job.json`, `zone.geojson`, `raw/` (Overpass cache), `processed/` (intermediate results and reports), `build.log` |
+| `jobs/<job>/` | `job.json`, `zone.geojson`, `raw/` (Overpass cache), `processed/` (intermediate results and reports), `overrides.json` (building edits), `models/` (custom OBJs), `build.log` |
 | `build/<pack>/` | The generated scenery pack (`Earth nav data/` DSFs, `objects/impostors/` distant blocks), linked into Custom Scenery on install |
 
 ## What install does

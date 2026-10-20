@@ -8,7 +8,10 @@ API:
   POST /api/jobs                        {name, scenery_name, zone, options, overwrite} create / replace a job
   GET  /api/jobs/<name>?since=n         job details, area, run state, log lines from n on
   GET  /api/jobs/<name>/buildings       classified buildings (map preview)
-  POST /api/jobs/<name>/build           {force_fetch} run the pipeline in the background (one job at a time)
+  POST /api/jobs/<name>/build           {force_fetch, steps} run the pipeline in the background (one job at a time)
+  GET  /api/jobs/<name>/overrides       per-building edits and the OBJ files in the job's models folder
+  POST /api/jobs/<name>/overrides       {building_id, edit} store one building's edit (empty edit removes it)
+  GET  /api/jobs/<name>/reference?id=   one building as a Wavefront OBJ for Blender (download)
   POST /api/jobs/<name>/install | uninstall
 """
 
@@ -21,7 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from cityscene import install as installer
-from cityscene import pipeline
+from cityscene import overrides, pipeline
 from cityscene.config import Job, dsftool_path, list_jobs, load_settings, save_local, xplane_root
 from cityscene.log import get_logger
 from cityscene.tools_setup import ensure_dsftool
@@ -42,7 +45,7 @@ def _run_state(name: str) -> dict:
     return _runs.setdefault(name, {"state": "idle", "step": None, "log": [], "error": None})
 
 
-def _start_build(name: str, force_fetch: bool) -> None:
+def _start_build(name: str, force_fetch: bool, steps: list | None = None) -> None:
     if not _run_lock.acquire(blocking=False):
         running = next((n for n, r in _runs.items() if r["state"] == "running"), "?")
         raise RuntimeError(f"Job {running} is running; wait for it to finish")
@@ -53,7 +56,7 @@ def _start_build(name: str, force_fetch: bool) -> None:
         try:
             settings = load_settings()
             job = Job.open(name, settings)
-            pipeline.run(job, settings, force_fetch=force_fetch, on_log=state["log"].append,
+            pipeline.run(job, settings, steps, force_fetch=force_fetch, on_log=state["log"].append,
                          on_step=lambda s: state.update(step=s))
             state["state"] = "done"
         except Exception as exc:  # background thread: hand the error to the UI
@@ -98,10 +101,25 @@ def buildings_preview(name: str) -> dict:
     path = Job.open(name, settings).processed_dir / "buildings_classified.geojson"
     data = _read_json(path) or {"features": []}
     features = data["features"][:PREVIEW_LIMIT]
-    keep = ("name", "height_m", "height_source", "category", "facade_style", "building")
+    keep = ("id", "building_id", "name", "height_m", "height_source", "category", "facade_style", "building")
     for f in features:
         f["properties"] = {k: f["properties"].get(k) for k in keep}
     return {"type": "FeatureCollection", "features": features, "total": len(data["features"])}
+
+
+def job_overrides(name: str) -> dict:
+    job = Job.open(name, load_settings())
+    models = []
+    if job.models_dir.is_dir():
+        models = sorted(p.relative_to(job.models_dir).as_posix() for p in job.models_dir.rglob("*")
+                        if p.suffix.lower() in (".obj", ".agp"))
+    return {"buildings": overrides.load(job), "models": models, "models_dir": str(job.models_dir)}
+
+
+def reference(name: str, building_id: str) -> str:
+    job = Job.open(name, load_settings())
+    data = _read_json(job.processed_dir / "buildings_classified.geojson") or {"features": []}
+    return overrides.reference_obj(data["features"], building_id)
 
 
 def status() -> dict:
@@ -176,9 +194,24 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(job_detail(parts[2], since))
             if parts[:2] == ["api", "jobs"] and len(parts) == 4 and parts[3] == "buildings":
                 return self._json(buildings_preview(parts[2]))
+            if parts[:2] == ["api", "jobs"] and len(parts) == 4 and parts[3] == "overrides":
+                return self._json(job_overrides(parts[2]))
+            if parts[:2] == ["api", "jobs"] and len(parts) == 4 and parts[3] == "reference":
+                building_id = parse_qs(url.query).get("id", [""])[0]
+                body = reference(parts[2], building_id).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Disposition",
+                                 f'attachment; filename="{building_id.replace("/", "_")}_reference.obj"')
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return None
             self._json({"error": "not found"}, 404)
         except FileNotFoundError as exc:
             self._error(exc, 404)
+        except ValueError as exc:
+            self._error(exc)
         except Exception as exc:
             self._error(exc, 500)
 
@@ -201,8 +234,15 @@ class Handler(BaseHTTPRequestHandler):
                 name, action = parts[2], parts[3]
                 if action == "build":
                     Job.open(name, settings)
-                    _start_build(name, bool(body.get("force_fetch")))
+                    _start_build(name, bool(body.get("force_fetch")), body.get("steps") or None)
                     return self._json({"started": True})
+                if action == "overrides":
+                    job = Job.open(name, settings)
+                    building_id = str(body.get("building_id") or "")
+                    if not building_id:
+                        raise ValueError("building_id is required")
+                    return self._json({"buildings": overrides.set_edit(job, building_id, body.get("edit"),
+                                                                       job.settings(settings))})
                 if action == "install":
                     return self._json(installer.install(Job.open(name, settings), settings))
                 if action == "uninstall":

@@ -9,6 +9,8 @@ Ported from melbourne-cbd-xp12 pipeline/03_classify.py (without heritage registe
    (FLOORS_MIN/MAX) covers every block. Otherwise blocks are chosen one by one, falling back to any style
    (style_fallback) and finally to the closest floor range (height_clamped)
 3. Choices are stable (crc32 of building_id): the same on every run, varied between buildings
+4. Per-building edits (overrides.py) apply first: height_m scales the building's blocks, style replaces the
+   preferred styles; every block carries "edit" (None / edit / delete / model) for build_dsf and the map preview
 
 Output: processed/buildings_classified.geojson and classify_report.json
 """
@@ -17,6 +19,7 @@ import json
 import zlib
 from collections import Counter, defaultdict
 
+from cityscene import overrides
 from cityscene.log import get_logger
 
 log = get_logger("classify")
@@ -81,9 +84,11 @@ def choose_facade(floors: int, styles: list, facades: list, seed: str) -> tuple[
     return _pick([f for f in facades if preference(f) == best], seed), True, True
 
 
-def classify(features: list, settings: dict) -> tuple[list, dict]:
+def classify(features: list, settings: dict, edits: dict | None = None) -> tuple[list, dict]:
     cfg = settings["classification"]
     facades = settings["facades"]
+    edits = edits or {}
+    heights_edited = overrides.apply_heights(features, edits)
 
     by_building = defaultdict(list)
     for feature in features:
@@ -91,6 +96,8 @@ def classify(features: list, settings: dict) -> tuple[list, dict]:
     categories = {bid: building_category(blocks, cfg) for bid, blocks in by_building.items()}
 
     def styles_for(bid):
+        if edits.get(bid, {}).get("style"):
+            return [edits[bid]["style"]]
         category, reason = categories[bid]
         if reason.startswith("heritage") and "heritage" in cfg["styles"]:
             return cfg["styles"]["heritage"]
@@ -126,6 +133,7 @@ def classify(features: list, settings: dict) -> tuple[list, dict]:
                 "facade_style": facade["style"],
                 "style_fallback": fallback,
                 "height_clamped": clamped,
+                "edit": overrides.edit_kind(edits.get(p["building_id"])),
             },
         })
 
@@ -138,6 +146,9 @@ def classify(features: list, settings: dict) -> tuple[list, dict]:
         "facade_usage": dict(Counter(f["properties"]["facade"].rsplit("/", 1)[-1] for f in out).most_common()),
         "style_fallback": stats["style_fallback"],
         "height_clamped": stats["height_clamped"],
+        "edited_buildings": dict(Counter(overrides.edit_kind(e) for b, e in edits.items() if b in by_building)),
+        "edited_heights": heights_edited,
+        "edits_not_found": sorted(b for b in edits if b not in by_building),
     }
     return out, report
 
@@ -150,7 +161,7 @@ def run(job, settings: dict) -> dict:
     with open(path, encoding="utf-8") as f:
         features = json.load(f)["features"]
 
-    out, report = classify(features, settings)
+    out, report = classify(features, settings, overrides.load(job))
     with open(processed / "buildings_classified.geojson", "w", encoding="utf-8") as f:
         json.dump({"type": "FeatureCollection", "features": out}, f, ensure_ascii=False)
     with open(processed / "classify_report.json", "w", encoding="utf-8") as f:
@@ -160,4 +171,7 @@ def run(job, settings: dict) -> dict:
              report["heritage_buildings"])
     log.info("Facade styles %s; fell back to a non-preferred style %d, floors outside every facade range %d",
              report["blocks_by_style"], report["style_fallback"], report["height_clamped"])
+    if report["edited_buildings"] or report["edits_not_found"]:
+        log.info("Edited buildings %s; edits whose building is no longer in the data: %d", report["edited_buildings"],
+                 len(report["edits_not_found"]))
     return report

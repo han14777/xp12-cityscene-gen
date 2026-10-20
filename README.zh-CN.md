@@ -36,6 +36,26 @@ python -m cityscene gui        # 或双击 start_gui.bat
 3. 完成后地图上按高度着色显示建筑，鼠标悬停可查看高度来源和 facade 风格
 4. 退出 X-Plane，点击"安装到 X-Plane"
 
+## 编辑建筑与自定义模型
+
+生成后在地图上点一栋楼，会打开"编辑建筑"：
+
+- **保留**：可以改高度（最高部分的高度，其他部分按同样比例缩放），或换外墙风格
+- **删除**
+- **替换为我的模型**：在楼的中心放一个 OBJ，可调朝向和向东 / 向北偏移
+
+修改按 OSM 建筑编号保存在 `jobs/<任务>/overrides.json`，重新下载 OSM 或重新生成都不会丢。
+点"应用修改"重新生成（只跑 classify 和 build_dsf，不重新下载）。
+
+自定义模型：把 `.obj` 和贴图放进 `jobs/<任务>/models/`（可以分子文件夹），填相对这个文件夹的路径，
+例如 `eureka/eureka.obj`；整个文件夹会被复制进地景包。也可以填 X-Plane 库路径（如 `lib/...`）。
+被替换的楼不再生成 facade 和远景体块。
+
+在 Blender 里建模：点"下载 Blender 参考模型"（或 `python -m cityscene reference <任务> way/123`），
+用"文件 → 导入 → Wavefront (.obj)"按默认坐标轴导入。它是这栋楼以放置点为原点的体块，在上面建模，
+用 [XPlane2Blender](https://github.com/X-Plane/XPlane2Blender) 导出，朝向 0、偏移 0 就能和地图对齐。
+也可以用 SketchUp、AC3D 的导出插件，或用代码生成模型。
+
 ## 命令行
 
 ```
@@ -45,6 +65,7 @@ python -m cityscene build sydney_cbd --steps clean,classify,build_dsf   # 改了
 python -m cityscene install sydney_cbd
 python -m cityscene uninstall sydney_cbd
 python -m cityscene list
+python -m cityscene reference sydney_cbd way/123   # 导出一栋楼给 Blender 当参考
 ```
 
 也可以用 `--zone area.geojson` 指定选区（例如在 geojson.io 画好后导出）。
@@ -70,7 +91,7 @@ X-Plane 12 自带 facade 只显示到 8–18 公里（由各 facade 自身设定
 |------|------|
 | `config/settings.yaml` | 全局默认：高度规则、清洗阈值、facade 列表、排除类型 |
 | `config/local.yaml` | 本机路径（X-Plane、DSFTool），不进 git |
-| `jobs/<任务>/` | `job.json`、`zone.geojson`、`raw/`（Overpass 缓存）、`processed/`（中间结果和报告）、`build.log` |
+| `jobs/<任务>/` | `job.json`、`zone.geojson`、`raw/`（Overpass 缓存）、`processed/`（中间结果和报告）、`overrides.json`（建筑修改）、`models/`（自定义模型）、`build.log` |
 | `build/<地景包>/` | 生成的地景包（`Earth nav data/` 中的 DSF、`objects/impostors/` 中的远景体块），安装时链接到 Custom Scenery |
 
 ## 安装做了什么

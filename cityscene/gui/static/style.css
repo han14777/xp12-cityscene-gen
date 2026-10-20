@@ -87,11 +87,21 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .bad-flag { color: var(--err); }
 .legend { background: var(--panel); color: var(--text); padding: 6px 8px; border-radius: 6px; font-size: 11px; line-height: 1.6; }
 .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; border-radius: 2px; }
+.legend hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.legend i.edit { background: transparent; border: 2px solid; }
+.legend i.delete { background: transparent; border: 1px dashed; }
+.legend i.model { border: 2px solid; background: #7b3fb5; }
 @media (max-width: 720px) {
   body { flex-direction: column; }
   #panel { width: 100%; height: auto; max-height: 55%; border-right: 0; border-bottom: 1px solid var(--line); }
   #map { min-height: 45%; }
 }
+.row.three { align-items: flex-end; }
+.row.three label { flex: 1; min-width: 0; }
+#edit-title { margin: 0 0 4px; }
+#edit-title small { color: var(--muted); }
+#edit-reference { margin-top: 8px; }
+#edit-count { font-size: 13px; color: var(--muted); }
 .title-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 #lang { display: flex; flex: none; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 #lang button { border: 0; border-radius: 0; padding: 3px 9px; font-size: 12px; background: transparent; color: var(--muted); }

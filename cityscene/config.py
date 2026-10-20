@@ -2,7 +2,8 @@
 
 - config/settings.yaml: global defaults; config/local.yaml (not in git): machine paths, overriding the same keys
 - A job lives in jobs/<name>/: job.json (name, scenery pack name, options), zone.geojson (the area),
-  raw/ (Overpass cache), processed/ (intermediate results); the generated pack goes to build/<pack name>/
+  raw/ (Overpass cache), processed/ (intermediate results), overrides.json (per-building edits), models/ (custom
+  OBJs); the generated pack goes to build/<pack name>/
 """
 
 import copy
@@ -143,6 +144,16 @@ class Job:
     @property
     def processed_dir(self) -> Path:
         return self.root / "processed"
+
+    @property
+    def overrides_path(self) -> Path:
+        """Per-building edits (cityscene/overrides.py)."""
+        return self.root / "overrides.json"
+
+    @property
+    def models_dir(self) -> Path:
+        """Custom OBJ models (and their textures) that replace buildings."""
+        return self.root / "models"
 
     @property
     def meta(self) -> dict:
