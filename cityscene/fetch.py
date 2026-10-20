@@ -11,6 +11,7 @@ Overpass and cache them in jobs/<name>/raw/.
 import json
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -97,6 +98,54 @@ def post_overpass(urls, query: str, timeout_s: int, max_retries: int, backoff_s:
             time.sleep(wait)
     raise RuntimeError(f"Overpass failed on every server ({attempts} attempts); try again later "
                        "or add another mirror to osm.overpass_url")
+
+
+# A tiny query (a count of nodes in a few square metres) to check that a server answers
+TEST_QUERY = "[out:json][timeout:15];node(-33.8570,151.2140,-33.8566,151.2146);out count;"
+
+
+def clean_server_list(urls) -> list[str]:
+    """Validate a server list from the UI: http(s) URLs, no duplicates, at least one."""
+    out = []
+    for url in urls or []:
+        url = str(url).strip()
+        if not url.startswith(("https://", "http://")):
+            raise ValueError(f"Not a server URL: {url!r}")
+        if url not in out:
+            out.append(url)
+    if not out:
+        raise ValueError("Keep at least one Overpass server")
+    return out
+
+
+def test_server(url: str, timeout_s: float = 25) -> dict:
+    """Send TEST_QUERY: {"url", "ok", "status" (HTTP code or None), "ms", "error" (None, "timeout" or a message)}."""
+    started = time.monotonic()
+    result = {"url": url, "ok": False, "status": None, "ms": None, "error": None}
+    try:
+        response = requests.post(url, data={"data": TEST_QUERY}, headers={"User-Agent": USER_AGENT},
+                                 timeout=(10, timeout_s))
+        result["status"] = response.status_code
+        if response.status_code == 200:
+            response.json()  # an Overpass server answers with JSON; a captive portal or proxy page does not
+            result["ok"] = True
+        else:
+            result["error"] = f"HTTP {response.status_code}"
+    except requests.Timeout:
+        result["error"] = "timeout"
+    except (requests.RequestException, ValueError) as exc:
+        result["error"] = str(exc)[:200]
+    result["ms"] = round((time.monotonic() - started) * 1000)
+    return result
+
+
+def test_servers(urls: list) -> list:
+    """Test several servers at once; results in the same order."""
+    urls = list(urls)[:12]
+    if not urls:
+        return []
+    with ThreadPoolExecutor(max_workers=len(urls)) as pool:
+        return list(pool.map(test_server, urls))
 
 
 def merge_overpass(datasets: list) -> dict:

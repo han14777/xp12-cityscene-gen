@@ -176,6 +176,7 @@ function refreshLanguage() {
   renderEditCount();
   if (selectedId) fillEditForm();
   updatePanelToggle();
+  renderServers();
 }
 
 document.querySelectorAll("#lang button").forEach((b) => {
@@ -215,11 +216,101 @@ async function loadStatus() {
   $("xplane-root").value = s.xplane_root;
   $("dsftool").value = s.dsftool;
   renderStatus(s);
+  initServers(s);
   $("settings-box").open = !(s.xplane_ok && s.dsftool_ok);
   if (!$("default-height").value) $("default-height").value = s.defaults.default_height_m;
   if (!$("render-distance").value) $("render-distance").value = s.defaults.render_distance_km;
   return s;
 }
+
+// ---------- Overpass servers: test, choose, order (saved right away) ----------
+let servers = [];        // [{url, on}] in order; checked ones are used, top first
+let shipped = [];
+let serverTests = {};    // url -> test result
+
+function initServers(s) {
+  shipped = s.overpass.shipped;
+  servers = s.overpass.known.map((url) => ({ url, on: s.overpass.active.includes(url) }));
+  renderServers();
+}
+
+function serverState(url) {
+  const r = serverTests[url];
+  if (r === "testing") return ["", t("srvTesting")];
+  if (!r) return ["", ""];
+  if (r.ok) return ["ok", t("srvOk", { ms: r.ms })];
+  if (r.error === "timeout") return ["bad", t("srvTimeout")];
+  if ([429, 502, 503, 504].includes(r.status)) return ["warn", t("srvBusy", { status: r.status })];
+  return ["bad", t("srvError", { error: r.error })];
+}
+
+function renderServers() {
+  $("server-list").innerHTML = servers.map((srv, i) => {
+    const [cls, text] = serverState(srv.url);
+    let host = srv.url;
+    try { host = new URL(srv.url).host; } catch (e) { /* keep the raw text */ }
+    return `<li title="${esc(srv.url)}"><input type="checkbox" data-on="${i}" ${srv.on ? "checked" : ""}>` +
+      `<span class="srv-host">${esc(host)}</span><span class="srv-state ${cls}">${esc(text)}</span>` +
+      `<button class="ghost" data-up="${i}" title="${esc(t("moveUp"))}" ${i === 0 ? "disabled" : ""}>↑</button>` +
+      (shipped.includes(srv.url) ? "" : `<button class="ghost" data-remove="${i}" title="${esc(t("removeServer"))}">×</button>`) +
+      "</li>";
+  }).join("");
+  $("server-list").querySelectorAll("[data-on]").forEach((c) => {
+    c.onchange = () => { servers[c.dataset.on].on = c.checked; saveServers(); };
+  });
+  $("server-list").querySelectorAll("[data-up]").forEach((b) => {
+    b.onclick = () => { const i = Number(b.dataset.up); [servers[i - 1], servers[i]] = [servers[i], servers[i - 1]]; saveServers(); };
+  });
+  $("server-list").querySelectorAll("[data-remove]").forEach((b) => {
+    b.onclick = () => { servers.splice(Number(b.dataset.remove), 1); saveServers(); };
+  });
+  $("servers-fastest").hidden = !Object.values(serverTests).some((r) => r && r.ok);
+}
+
+async function saveServers() {
+  const urls = servers.filter((s) => s.on).map((s) => s.url);
+  if (!urls.length) {
+    say("needOneServer", {}, "warn");
+    return loadStatus().catch(sayError);
+  }
+  try {
+    await api("/api/overpass", { body: { urls } });
+    renderServers();
+    say("serversSaved", {}, "ok");
+  } catch (e) { sayError(e); }
+}
+
+$("test-servers").onclick = async () => {
+  const urls = servers.map((s) => s.url);
+  urls.forEach((u) => { serverTests[u] = "testing"; });
+  renderServers();
+  $("test-servers").disabled = true;
+  try {
+    for (const r of await api("/api/overpass/test", { body: { urls } })) serverTests[r.url] = r;
+  } catch (e) {
+    urls.forEach((u) => { delete serverTests[u]; });
+    sayError(e);
+  } finally {
+    $("test-servers").disabled = false;
+    renderServers();
+  }
+};
+
+// Working servers first, fastest on top, and only those checked; the others stay listed but unchecked
+$("servers-fastest").onclick = () => {
+  const ok = (s) => serverTests[s.url] && serverTests[s.url].ok;
+  servers.sort((a, b) => (ok(b) - ok(a)) || ((ok(a) && ok(b)) ? serverTests[a.url].ms - serverTests[b.url].ms : 0));
+  servers.forEach((s) => { s.on = Boolean(ok(s)); });
+  saveServers();
+};
+
+$("server-add-btn").onclick = () => {
+  const url = $("server-add").value.trim();
+  if (!/^https?:\/\//.test(url)) return say("badServerUrl", {}, "warn");
+  if (!servers.some((s) => s.url === url)) servers.push({ url, on: true });
+  $("server-add").value = "";
+  saveServers();
+};
 
 $("save-settings").onclick = async () => {
   try {

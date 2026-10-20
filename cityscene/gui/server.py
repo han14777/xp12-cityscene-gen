@@ -4,6 +4,8 @@ page and a JSON API, and runs the pipeline in a background thread.
 API:
   GET  /api/status                      machine paths, whether X-Plane is running, default options
   POST /api/settings                    {xplane_root, dsftool} saved to config/local.yaml
+  POST /api/overpass                    {urls} the Overpass servers to use, in order (saved to config/local.yaml)
+  POST /api/overpass/test               {urls} test each server with a tiny query
   GET  /api/jobs                        job list
   POST /api/jobs                        {name, scenery_name, zone, options, overwrite} create / replace a job
   GET  /api/jobs/<name>?since=n         job details, area, run state, log lines from n on
@@ -28,7 +30,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from cityscene import install as installer
-from cityscene import overrides, pipeline, transfer
+from cityscene import fetch, overrides, pipeline, transfer
 from cityscene.gui import picker
 from cityscene.config import Job, dsftool_path, list_jobs, load_settings, save_local, xplane_root
 from cityscene.log import get_logger
@@ -133,7 +135,11 @@ def status() -> dict:
     settings = load_settings()
     root = xplane_root(settings)
     tool = dsftool_path(settings)
+    active = fetch.overpass_urls(settings["osm"]["overpass_url"])
+    shipped = fetch.overpass_urls(load_settings(local_path=None)["osm"]["overpass_url"])
     return {
+        "overpass": {"active": active, "shipped": shipped,
+                     "known": active + [u for u in shipped if u not in active]},
         "xplane_root": str(root) if root else "",
         "xplane_ok": bool(root and (root / "Custom Scenery").is_dir()),
         "dsftool": str(tool) if tool else settings["tools"].get("dsftool", ""),
@@ -235,6 +241,11 @@ class Handler(BaseHTTPRequestHandler):
                 save_local({"xplane": {"root": body.get("xplane_root", "").strip()},
                             "tools": {"dsftool": body.get("dsftool", "").strip()}})
                 return self._json(status())
+            if parts == ["api", "overpass"]:
+                save_local({"osm": {"overpass_url": fetch.clean_server_list(body.get("urls"))}})
+                return self._json(status())
+            if parts == ["api", "overpass", "test"]:
+                return self._json(fetch.test_servers(fetch.clean_server_list(body.get("urls"))))
             if parts == ["api", "pick"]:
                 return self._json({"path": picker.pick(str(body.get("kind")), str(body.get("title") or ""),
                                                        str(body.get("initial") or ""))})

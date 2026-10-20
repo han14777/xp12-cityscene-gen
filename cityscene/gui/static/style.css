@@ -125,6 +125,20 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 #edit-title { margin: 0 0 4px; }
 #edit-title small { color: var(--muted); }
 #edit-reference { margin-top: 8px; }
+/* Overpass servers in Local settings */
+#servers-box { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.label-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.label-row button { padding: 4px 10px; font-size: 12px; }
+#server-list li { padding: 6px 8px; gap: 6px; }
+#server-list input[type=checkbox] { flex: none; margin: 0; }
+#server-list .srv-host { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+#server-list .srv-state { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#server-list .srv-state.ok { color: var(--ok); }
+#server-list .srv-state.bad { color: var(--err); }
+#server-list .srv-state.warn { color: var(--warn); }
+#server-list button { flex: none; padding: 2px 7px; font-size: 12px; }
+#servers-fastest { margin-bottom: 8px; }
+
 /* Start chooser: new / open / import */
 #start-box, #project-bar { border-top: 1px solid var(--line); padding: 12px 0; }
 .tabs { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }

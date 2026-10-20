@@ -31,6 +31,13 @@
     </label>
     <button id="save-settings" data-i18n="save"></button>
     <p class="hint" data-i18n="dsftoolHint"></p>
+    <div id="servers-box">
+      <div class="label-row"><span data-i18n="osmServers"></span><button id="test-servers" class="ghost" data-i18n="testServers"></button></div>
+      <ul id="server-list" class="item-list"></ul>
+      <button id="servers-fastest" class="ghost" data-i18n="fastestFirst" hidden></button>
+      <span class="path-row"><input id="server-add" placeholder="https://example.org/api/interpreter"><button id="server-add-btn" data-i18n="addServer"></button></span>
+      <p class="hint" data-i18n="serversHint"></p>
+    </div>
   </details>
 
   <!-- Start: choose new / open / import while no project is open -->

@@ -45,10 +45,11 @@ def deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
-def load_settings(path: Path = SETTINGS_PATH, local_path: Path = LOCAL_PATH) -> dict:
+def load_settings(path: Path = SETTINGS_PATH, local_path: Path | None = LOCAL_PATH) -> dict:
+    """settings.yaml with config/local.yaml on top; local_path=None gives the shipped defaults only."""
     with open(path, encoding="utf-8") as f:
         settings = yaml.safe_load(f)
-    if local_path.exists():
+    if local_path is not None and local_path.exists():
         with open(local_path, encoding="utf-8") as f:
             settings = deep_merge(settings, yaml.safe_load(f) or {})
     return settings

@@ -34,6 +34,9 @@ python -m cityscene gui        # or double-click start_gui.bat
 ```
 
 The UI is in English by default; switch with the EN / 中文 buttons next to the title (remembered by the browser).
+Under "Local settings", "OSM data servers" lists the Overpass servers: "Test connections" shows which answer and
+how fast, servers can be ticked, reordered or added, and one click keeps only the working ones, fastest first.
+
 Drag the divider next to the map to resize the panel (double-click resets it; the ‹ button hides it), and fold any
 step by its title. Every path field has a "Browse…" button that opens the system's file dialog; paths can also be
 typed. A model picked outside the job is copied into its `models/` folder together with its textures.
