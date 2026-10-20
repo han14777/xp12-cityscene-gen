@@ -12,6 +12,7 @@ import json
 import math
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import requests
 from shapely.geometry import box
@@ -60,21 +61,42 @@ def build_query(kind: str, swne: tuple, timeout_s: int) -> str:
     return f"[out:json][timeout:{timeout_s}];\n" + QUERIES[kind].format(area=area) + "out body;\n>;\nout skel qt;\n"
 
 
-def post_overpass(url: str, query: str, timeout_s: int, max_retries: int, backoff_s: float) -> dict:
-    for attempt in range(1, max_retries + 1):
+def overpass_urls(value) -> list[str]:
+    """osm.overpass_url may be one URL or a list of mirrors tried in turn."""
+    urls = [value] if isinstance(value, str) else list(value or [])
+    if not urls:
+        raise RuntimeError("osm.overpass_url is empty")
+    return urls
+
+
+def post_overpass(urls, query: str, timeout_s: int, max_retries: int, backoff_s: float) -> dict:
+    """Try each mirror in turn; after a full round without success wait backoff_s x round, up to max_retries rounds.
+    A 200 response whose remark reports a runtime error (timeout, out of memory) holds partial data and counts as
+    a failure, so it is never cached."""
+    urls = overpass_urls(urls)
+    attempts = max_retries * len(urls)
+    for attempt in range(1, attempts + 1):
+        url = urls[(attempt - 1) % len(urls)]
+        host = urlparse(url).netloc
         try:
             response = requests.post(url, data={"data": query}, headers={"User-Agent": USER_AGENT},
-                                     timeout=timeout_s + 30)
+                                     timeout=(15, timeout_s + 30))
             if response.status_code == 200:
-                return response.json()
-            log.warning("Attempt %d returned HTTP %d", attempt, response.status_code)
+                data = response.json()
+                remark = data.get("remark") or ""
+                if "runtime error" not in remark:
+                    return data
+                log.warning("Attempt %d/%d (%s) returned partial data: %s", attempt, attempts, host, remark.strip())
+            else:
+                log.warning("Attempt %d/%d (%s) returned HTTP %d", attempt, attempts, host, response.status_code)
         except (requests.RequestException, ValueError) as exc:
-            log.warning("Attempt %d failed: %s", attempt, exc)
-        if attempt < max_retries:
-            wait = backoff_s * attempt
-            log.info("Retrying in %.0f s", wait)
+            log.warning("Attempt %d/%d (%s) failed: %s", attempt, attempts, host, exc)
+        if attempt < attempts and attempt % len(urls) == 0:
+            wait = backoff_s * (attempt // len(urls))
+            log.info("All Overpass servers busy; retrying in %.0f s", wait)
             time.sleep(wait)
-    raise RuntimeError(f"Overpass failed {max_retries} times; try again later or change osm.overpass_url")
+    raise RuntimeError(f"Overpass failed on every server ({attempts} attempts); try again later "
+                       "or add another mirror to osm.overpass_url")
 
 
 def merge_overpass(datasets: list) -> dict:

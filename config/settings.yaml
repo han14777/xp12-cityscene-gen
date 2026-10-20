@@ -20,13 +20,19 @@ paths:
   build_dir: "build"
 
 osm:
-  overpass_url: "https://overpass-api.de/api/interpreter"
+  # One URL or a list of public mirrors, tried in turn when a server is busy (502 / 504) or fails
+  overpass_url:
+    - "https://overpass-api.de/api/interpreter"
+    - "https://overpass.kumi.systems/api/interpreter"
+    - "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+    - "https://overpass.private.coffee/api/interpreter"
   # Buffer (metres) added to the area's bounding box for queries; the exact filter by centroid happens in clean
   bbox_buffer_m: 100
   # Large areas are queried in chunks on a lon/lat grid of this size (degrees) to avoid Overpass timeouts
   chunk_deg: 0.05
   request_timeout_s: 180
-  # overpass-api.de often returns 504 in a row when busy; the wait grows with each retry
+  # overpass-api.de often returns 502 / 504 in a row when busy. One round tries every mirror once; after a failed
+  # round the wait grows (retry_backoff_s x round), up to max_retries rounds
   max_retries: 6
   retry_backoff_s: 30
   # Refuse areas larger than this (km²): Overpass load and DSF size get out of hand; split the area instead
