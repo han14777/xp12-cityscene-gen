@@ -9,7 +9,7 @@ python -m PyInstaller --noconfirm --clean --distpath dist --workpath packaging/b
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
 $app = "dist/CityScene"
-Copy-Item README.md, LICENSE $app
+Copy-Item README.md, README.zh-CN.md, LICENSE $app
 Copy-Item packaging/START_HERE.txt $app
 
 # Zipped with Python: Compress-Archive in Windows PowerShell 5.1 writes backslash paths that some unzip tools reject

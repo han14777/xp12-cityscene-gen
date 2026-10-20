@@ -1,5 +1,7 @@
 # xp12-cityscene-gen
 
+**English** | [简体中文](README.zh-CN.md)
+
 Draw an area on a map and generate X-Plane 12 city building scenery in one go:
 OpenStreetMap building outlines and heights → cleaning → X-Plane 12 default facades → DSF (which also hides the
 default autogen buildings inside the area) → linked into Custom Scenery.
