@@ -122,3 +122,17 @@ def test_rejects_foreign_folders_and_pack_name_clashes(tmp_path, tool):
     Job.create("mine", ZONE, other, "CityScene_src")
     with pytest.raises(ValueError, match="already uses the pack name"):
         transfer.import_pack(job.build_dir(settings), other)
+
+
+def test_copy_of_an_imported_pack_imports_under_a_new_name(tmp_path, tool):
+    job, settings = built_job(tmp_path / "a", tool)
+    pack = tmp_path / "shared" / "CityScene_src"
+    shutil.copytree(job.build_dir(settings), pack)
+    other = copy_settings(tmp_path / "b", tool)
+    transfer.import_pack(pack, other)
+    with pytest.raises(FileExistsError):
+        transfer.import_pack(pack, other)
+    copy = transfer.import_pack(pack, other, name="src_2")
+    assert copy["name"] == "src_2" and copy["scenery_name"] == "CityScene_src_2"
+    assert Job.open("src", other).scenery_name == "CityScene_src"
+    assert (Job.open("src_2", other).build_dir(other) / "Earth nav data").is_dir()

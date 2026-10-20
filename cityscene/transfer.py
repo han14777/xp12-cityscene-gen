@@ -194,11 +194,20 @@ def import_pack(pack: Path, settings: dict, name: str | None = None, overwrite: 
     meta = _meta_for(pack, kind)
     if meta.get("format", FORMAT) > FORMAT:
         raise ValueError("This pack was made by a newer version of xp12-cityscene-gen; update the tool first")
-    name = check_name(name or meta.get("name") or _default_name(pack.name))
+    stored_name = meta.get("name") or _default_name(pack.name)
+    name = check_name(name or stored_name)
     scenery_name = check_name(meta.get("scenery_name") or pack.name)
-    for other in list_jobs(settings):
-        if other != name and Job.open(other, settings).scenery_name == scenery_name:
-            raise ValueError(f"Job {other} already uses the pack name {scenery_name}; delete or rename it first")
+
+    def pack_owner(pack_name):
+        return next((o for o in list_jobs(settings) if o != name and Job.open(o, settings).scenery_name == pack_name), None)
+
+    owner = pack_owner(scenery_name)
+    if owner and name != stored_name:
+        # Imported as a copy under a new name: the pack gets a matching name too, so both can be installed
+        scenery_name = check_name(f"CityScene_{name}")
+        owner = pack_owner(scenery_name)
+    if owner:
+        raise ValueError(f"Job {owner} already uses the pack name {scenery_name}; import under another name")
 
     source = source_job(pack) if kind == "job" else None
     if kind == "job":

@@ -74,7 +74,7 @@ header { padding-bottom: 8px; }
 summary { cursor: pointer; font-weight: 600; }
 label { display: block; margin: 8px 0; font-size: 13px; }
 label.check { display: flex; gap: 6px; align-items: center; }
-input:not([type=checkbox]), select {
+input:not([type=checkbox]):not([type=radio]), select {
   display: block; width: 100%; margin-top: 4px; padding: 6px 8px;
   border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit;
 }

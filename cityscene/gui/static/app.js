@@ -533,7 +533,9 @@ async function importPack(path, name, overwrite) {
     await openJob(r.name, true);
     say(r.kind === "legacy" ? "importedLegacy" : "imported", { name: r.name, blocks: r.blocks, edits: r.edits, models: r.models }, "ok");
   } catch (e) {
-    const taken = !overwrite && (e.message.match(/^Job (\S+) already exists/) || [])[1];
+    // A job with this name exists, or another job already uses this pack's name: import under a new name
+    const taken = !overwrite && ((e.message.match(/^Job (\S+) already exists/) || [])[1] ||
+      (e.message.match(/already uses the pack name/) && (name || e.message.match(/^Job (\S+)/)[1])));
     if (!taken) return sayError(e);
     const chosen = prompt(t("importNameTaken", { name: taken }), uniqueName(taken));
     if (chosen && chosen.trim()) return importPack(path, chosen.trim(), false);
