@@ -17,6 +17,7 @@ KINDS = {
     "folder": None,
     "exe": [("Programs", "*.exe"), ("All files", "*.*")],
     "obj": [("X-Plane objects", "*.obj *.agp"), ("All files", "*.*")],
+    "osm": [("OSM data", "*.pbf *.osm *.bz2"), ("All files", "*.*")],
 }
 _lock = threading.Lock()
 

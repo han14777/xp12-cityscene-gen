@@ -125,6 +125,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 #edit-title { margin: 0 0 4px; }
 #edit-title small { color: var(--muted); }
 #edit-reference { margin-top: 8px; }
+/* OSM data source in project settings */
+#source-box { margin: 10px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+#source-box .label-text { font-size: 13px; margin-bottom: 2px; }
+#source-box label.check { margin: 4px 0; }
+#source-file-box { margin-top: 6px; }
+#bbbike { margin-top: 8px; }
+
 /* Overpass servers in Local settings */
 #servers-box { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .label-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }

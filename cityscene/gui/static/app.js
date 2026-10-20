@@ -337,6 +337,36 @@ $("search").addEventListener("keydown", async (e) => {
 
 $("clear-zone").onclick = () => { zoneLayer.clearLayers(); updateArea(); };
 
+// ---------- OSM data source: Overpass servers or a local file / download link (e.g. from BBBike) ----------
+function sourceType() {
+  return document.querySelector('input[name="source"]:checked').value;
+}
+
+function setSource(source) {
+  const type = source && source.type === "file" ? "file" : "overpass";
+  document.querySelector(`input[name="source"][value="${type}"]`).checked = true;
+  $("source-file").value = type === "file" ? source.path : "";
+  $("source-file-box").hidden = type !== "file";
+}
+
+document.querySelectorAll('input[name="source"]').forEach((r) => {
+  r.onchange = () => { $("source-file-box").hidden = sourceType() !== "file"; };
+});
+
+// Opens BBBike's extract page with the drawn area (plus a small margin) and PBF format filled in; the user adds an
+// e-mail address and submits there, then pastes the link from the e-mail (or chooses the downloaded file) here
+$("bbbike").onclick = () => {
+  if (!zoneLayer.getLayers().length) return say("needZone", {}, "warn");
+  const b = zoneLayer.getBounds().pad(0.05);
+  const f = (v) => v.toFixed(5);
+  const params = new URLSearchParams({
+    sw_lng: f(b.getWest()), sw_lat: f(b.getSouth()), ne_lng: f(b.getEast()), ne_lat: f(b.getNorth()),
+    format: "osm.pbf", city: currentJob || $("job-name").value.trim() || "cityscene",
+  });
+  window.open("https://extract.bbbike.org/?" + params.toString(), "_blank", "noopener");
+  say("bbbikeOpened", {}, "ok");
+};
+
 $("job-name").addEventListener("input", (e) => {
   $("scenery-name").placeholder = "CityScene_" + (e.target.value || "name");
 });
@@ -452,6 +482,7 @@ $("switch-project").onclick = () => {
   $("edit-form").hidden = true;
   $("job-name").value = "";
   $("scenery-name").value = "";
+  setSource(null);
   $("log").textContent = "";
   say(null, { text: "" });
   showTab(startTab);
@@ -470,6 +501,7 @@ async function openJob(name, fit) {
   if (dh) $("default-height").value = dh;
   const rd = d.meta.options?.dsf?.render_distance_km;
   if (rd) $("render-distance").value = rd;
+  setSource(d.meta.source);
   zoneLayer.clearLayers();
   L.geoJSON(d.zone).eachLayer((l) => zoneLayer.addLayer(l));
   updateArea();
@@ -490,6 +522,8 @@ $("build").onclick = async () => {
   const existing = jobList.some((j) => j.name === name);
   if (existing && name !== currentJob && !confirm(t("confirmOverwrite", { name }))) return;
   const sceneryName = currentJob ? currentDetail.meta.scenery_name : $("scenery-name").value.trim();
+  const source = sourceType() === "file" ? { type: "file", path: $("source-file").value.trim() } : { type: "overpass" };
+  if (source.type === "file" && !source.path) return say("needSourceFile", {}, "warn");
   try {
     const options = {};
     const dh = parseFloat($("default-height").value);
@@ -497,7 +531,7 @@ $("build").onclick = async () => {
     const rd = parseFloat($("render-distance").value);
     if (rd > 0) options.dsf = { render_distance_km: rd };
     await api("/api/jobs", { body: {
-      name, scenery_name: sceneryName, zone: zoneLayer.toGeoJSON(), options, overwrite: existing,
+      name, scenery_name: sceneryName, zone: zoneLayer.toGeoJSON(), options, source, overwrite: existing,
     } });
     await loadJobs();
     currentJob = name;

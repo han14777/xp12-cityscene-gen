@@ -92,6 +92,16 @@
     <label><span data-i18n="defaultHeight"></span><input id="default-height" type="number" min="3" max="100" step="1"></label>
     <label><span data-i18n="renderDistance"></span><input id="render-distance" type="number" min="5" max="100" step="1"></label>
     <p class="hint" data-i18n="renderDistanceHint"></p>
+    <div id="source-box">
+      <div class="label-text" data-i18n="dataSource"></div>
+      <label class="check"><input type="radio" name="source" value="overpass" checked> <span data-i18n="sourceOverpass"></span></label>
+      <label class="check"><input type="radio" name="source" value="file"> <span data-i18n="sourceFile"></span></label>
+      <div id="source-file-box" hidden>
+        <span class="path-row"><input id="source-file" data-i18n-placeholder="sourceFilePh"><button class="browse" data-pick="osm" data-for="source-file" data-i18n="browse"></button></span>
+        <button id="bbbike" class="ghost" data-i18n="bbbikeBtn"></button>
+        <p class="hint" data-i18n="sourceFileHint"></p>
+      </div>
+    </div>
     <label class="check"><input id="force-fetch" type="checkbox"> <span data-i18n="forceFetch"></span></label>
     <button id="build" class="primary"></button>
   </details>

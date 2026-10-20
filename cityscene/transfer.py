@@ -48,6 +48,7 @@ def write_job_data(job, build_dir: Path) -> None:
     meta = job.meta
     (out / "job.json").write_text(json.dumps({
         "format": FORMAT, "name": job.name, "scenery_name": job.scenery_name, "options": meta.get("options", {}),
+        "source": job.source,
         "generated_at": datetime.now().isoformat(timespec="seconds")}, ensure_ascii=False, indent=2), encoding="utf-8")
     shutil.copyfile(job.zone_path, out / "zone.geojson")
     if job.overrides_path.exists():
@@ -211,7 +212,7 @@ def import_pack(pack: Path, settings: dict, name: str | None = None, overwrite: 
         distance = legacy_render_distance(pack)
         options = {"dsf": {"render_distance_km": distance}} if distance else {}
     existed = (project_path(settings["paths"]["jobs_dir"]) / name / "job.json").exists()
-    job = Job.create(name, zone, settings, scenery_name, options, overwrite=overwrite)
+    job = Job.create(name, zone, settings, scenery_name, options, overwrite=overwrite, source=meta.get("source"))
     if existed:
         # Replacing a job: drop what belonged to the old one
         for old in (job.processed_dir, job.raw_dir, job.models_dir):

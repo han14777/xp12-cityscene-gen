@@ -7,7 +7,7 @@ API:
   POST /api/overpass                    {urls} the Overpass servers to use, in order (saved to config/local.yaml)
   POST /api/overpass/test               {urls} test each server with a tiny query
   GET  /api/jobs                        job list
-  POST /api/jobs                        {name, scenery_name, zone, options, overwrite} create / replace a job
+  POST /api/jobs                        {name, scenery_name, zone, options, source, overwrite} create / replace a job
   GET  /api/jobs/<name>?since=n         job details, area, run state, log lines from n on
   GET  /api/jobs/<name>/buildings       classified buildings (map preview)
   POST /api/jobs/<name>/build           {force_fetch, steps} run the pipeline in the background (one job at a time)
@@ -257,7 +257,8 @@ class Handler(BaseHTTPRequestHandler):
                                                        overwrite=bool(body.get("overwrite"))))
             if parts == ["api", "jobs"]:
                 job = Job.create(body["name"], body["zone"], settings, body.get("scenery_name") or None,
-                                 body.get("options") or {}, overwrite=bool(body.get("overwrite")))
+                                 body.get("options") or {}, overwrite=bool(body.get("overwrite")),
+                                 source=body.get("source"))
                 return self._json({"name": job.name})
             if parts[:2] == ["api", "jobs"] and len(parts) == 4:
                 name, action = parts[2], parts[3]

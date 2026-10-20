@@ -3,7 +3,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 root = Path(SPECPATH).parent
 
@@ -15,7 +15,7 @@ a = Analysis(
         (str(root / "config" / "settings.yaml"), "config"),
         *collect_data_files("pyproj"),
     ],
-    hiddenimports=[],
+    hiddenimports=collect_submodules("osmium"),
     # tkinter stays in: the UI's "Browse..." buttons open native file dialogs through it
     excludes=["pytest"],
 )

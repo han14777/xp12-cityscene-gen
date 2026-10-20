@@ -21,7 +21,7 @@ The rest of this README covers running from source.
 
 ## Requirements
 
-- Python 3.11+: `pip install -e ".[dev]"`
+- Python 3.11+: `pip install -e ".[dev]"` (includes pyosmium for reading OSM files)
 - X-Plane 12 (its location is read automatically from `%LOCALAPPDATA%\x-plane_install_12.txt`)
 - `DSFTool.exe` from Laminar's [XPTools](https://developer.x-plane.com/tools/xptools/): downloaded automatically
   into `tools/` on first use, or set your own path under "Local settings" in the UI (saved to `config/local.yaml`,
@@ -98,6 +98,21 @@ python -m cityscene import "X-Plane 12/Custom Scenery/CityScene_sydney_cbd"   # 
 ```
 
 `--zone area.geojson` works too (e.g. drawn and exported from geojson.io).
+
+## OSM data from a file (BBBike, Geofabrik)
+
+When the Overpass servers are busy or unreachable, choose "OSM file (.osm.pbf) or download link" as the data source in
+the project settings and give a local `.osm.pbf` / `.osm` file or a download link:
+
+- [BBBike](https://extract.bbbike.org/): ready-made files for about 200 cities, or a custom area. "Get this area from
+  BBBike…" opens its page with the drawn area filled in; enter your e-mail, press extract, and after a few minutes
+  paste the download link from the e-mail (or download the file and choose it). BBBike is free for personal use
+  under a fair-use policy and runs on donations
+- [Geofabrik](https://download.geofabrik.de/): files per country or state, updated daily
+
+The file is read with [pyosmium](https://osmcode.org/pyosmium/); the buildings and roads in the area are taken out
+and the rest of the pipeline is the same. A link is downloaded once into the project; the extract is reused until the
+file or the area changes. Command line: `python -m cityscene new adelaide --bbox ... --osm-file adelaide.osm.pbf`.
 
 ## Render distance
 

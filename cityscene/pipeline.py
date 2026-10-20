@@ -7,7 +7,7 @@ import logging
 import time
 from datetime import datetime
 
-from cityscene import build_dsf, classify, clean, fetch
+from cityscene import build_dsf, classify, clean, fetch, osm_file
 from cityscene.geo import area_km2
 from cityscene.log import get_logger
 
@@ -55,7 +55,9 @@ def run(job, base_settings: dict, steps: list | None = None, force_fetch: bool =
                 on_step(step)
             started = time.time()
             log.info("== %s ==", step)
-            if step == "fetch":
+            if step == "fetch" and job.source["type"] == "file":
+                reports[step] = osm_file.fetch_file(job, settings, job.source["path"], force=force_fetch)
+            elif step == "fetch":
                 reports[step] = fetch.fetch(job, settings, force=force_fetch)
             elif step == "clean":
                 reports[step] = clean.run(job, settings)

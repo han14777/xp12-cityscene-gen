@@ -114,8 +114,9 @@ class Job:
 
     @classmethod
     def create(cls, name: str, zone: dict, settings: dict, scenery_name: str | None = None,
-               options: dict | None = None, overwrite: bool = False) -> "Job":
-        """zone is GeoJSON (Feature / FeatureCollection / Polygon / MultiPolygon)."""
+               options: dict | None = None, overwrite: bool = False, source: dict | None = None) -> "Job":
+        """zone is GeoJSON (Feature / FeatureCollection / Polygon / MultiPolygon). source is where OSM data comes
+        from: {"type": "overpass"} (default) or {"type": "file", "path": file path or download link}."""
         job = cls(check_name(name), project_path(settings["paths"]["jobs_dir"]) / name)
         if job.meta_path.exists() and not overwrite:
             raise FileExistsError(f"Job {name} already exists")
@@ -126,6 +127,8 @@ class Job:
             "scenery_name": check_name(scenery_name or f"CityScene_{name}"),
             "options": options or {},
         })
+        if source is not None:
+            meta["source"] = check_source(source)
         job.write_meta(meta)
         job.zone_path.write_text(json.dumps(normalize_zone(zone), ensure_ascii=False, indent=1), encoding="utf-8")
         return job
@@ -164,6 +167,10 @@ class Job:
         self.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     @property
+    def source(self) -> dict:
+        return self.meta.get("source") or {"type": "overpass"}
+
+    @property
     def scenery_name(self) -> str:
         return self.meta["scenery_name"]
 
@@ -178,6 +185,18 @@ class Job:
     def zones(self) -> list:
         """The area as a list of Features, each with a unique properties.id."""
         return json.loads(self.zone_path.read_text(encoding="utf-8"))["features"]
+
+
+def check_source(source: dict) -> dict:
+    kind = (source or {}).get("type", "overpass")
+    if kind == "overpass":
+        return {"type": "overpass"}
+    if kind == "file":
+        path = str(source.get("path") or "").strip().strip('"')
+        if not path:
+            raise ValueError("Choose an OSM file (.osm.pbf) or paste a download link")
+        return {"type": "file", "path": path}
+    raise ValueError(f"Unknown data source {kind!r}")
 
 
 def normalize_zone(zone: dict) -> dict:

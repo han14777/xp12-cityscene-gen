@@ -2,6 +2,7 @@
 
   gui                                    start the browser map UI (default http://127.0.0.1:8765)
   new <name> (--bbox W,S,E,N | --zone file.geojson) [--scenery pack] [--default-height 12] [--render-distance 30]
+      [--osm-file extract.osm.pbf | download link]   read OSM from a file (e.g. BBBike / Geofabrik) instead of Overpass
   build <name> [--steps fetch,clean,...] [--force-fetch]
   install <name> / uninstall <name>
   reference <name> <building_id> [-o file.obj]   one building as a Wavefront OBJ for Blender
@@ -43,6 +44,7 @@ def main(argv=None) -> int:
     p.add_argument("--scenery", help="scenery pack name (default CityScene_<name>)")
     p.add_argument("--default-height", type=float, help="default height in metres when OSM has none")
     p.add_argument("--render-distance", type=float, help="how far buildings stay visible, in km (default 30)")
+    p.add_argument("--osm-file", help="read OSM data from this .osm.pbf file or download link instead of Overpass")
     p.add_argument("--overwrite", action="store_true")
 
     p = sub.add_parser("build", help="run the pipeline")
@@ -56,7 +58,7 @@ def main(argv=None) -> int:
 
     # Used by the map UI's "Browse..." buttons (cityscene/gui/picker.py): shows a native dialog, prints JSON
     p = sub.add_parser("pick", help="show a native file / folder dialog and print the choice as JSON (used by the UI)")
-    p.add_argument("kind", choices=["folder", "exe", "obj"])
+    p.add_argument("kind", choices=["folder", "exe", "obj", "osm"])
     p.add_argument("--title", default="")
     p.add_argument("--initial", default="")
 
@@ -86,7 +88,8 @@ def main(argv=None) -> int:
             options = {"heights": {"default_height_m": args.default_height}} if args.default_height else {}
             if args.render_distance:
                 options["dsf"] = {"render_distance_km": args.render_distance}
-            job = Job.create(args.name, zone, settings, args.scenery, options, overwrite=args.overwrite)
+            source = {"type": "file", "path": args.osm_file} if args.osm_file else None
+            job = Job.create(args.name, zone, settings, args.scenery, options, overwrite=args.overwrite, source=source)
             print(f"Created job {job.name}: {job.root}")
         elif args.command == "build":
             steps = args.steps.split(",") if args.steps else None

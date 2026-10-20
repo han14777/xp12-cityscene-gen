@@ -18,7 +18,7 @@ X-Plane 12 的位置会自动识别。任务和生成的地景都保存在解压
 
 ## 运行环境
 
-- Python 3.11+：`pip install -e ".[dev]"`
+- Python 3.11+：`pip install -e ".[dev]"`（含读取 OSM 文件用的 pyosmium）
 - X-Plane 12（位置自动从 `%LOCALAPPDATA%\x-plane_install_12.txt` 读取）
 - Laminar [XPTools](https://developer.x-plane.com/tools/xptools/) 中的 `DSFTool.exe`：首次使用时自动下载到 `tools/`，
   也可在界面"本机设置"中填写自己的路径（保存到 `config/local.yaml`，不进 git）
@@ -89,6 +89,19 @@ python -m cityscene import "X-Plane 12/Custom Scenery/CityScene_sydney_cbd"   # 
 ```
 
 也可以用 `--zone area.geojson` 指定选区（例如在 geojson.io 画好后导出）。
+
+## 从文件读取 OSM 数据（BBBike、Geofabrik）
+
+Overpass 服务器繁忙或连不上时，可以在项目设置里把数据来源选为"OSM 文件（.osm.pbf）或下载链接"，填本地的
+`.osm.pbf` / `.osm` 文件或下载链接：
+
+- [BBBike](https://extract.bbbike.org/)：约 200 个城市的现成文件，也能定制区域。"从 BBBike 获取这片区域…"会打开它的
+  网页并填好画的区域；填邮箱、点 extract，几分钟后把邮件里的下载链接粘贴进来（或下载后选择文件）。BBBike 个人使用免费，
+  有合理使用限制，靠捐款运营
+- [Geofabrik](https://download.geofabrik.de/)：按国家或州提供，每天更新
+
+文件用 [pyosmium](https://osmcode.org/pyosmium/) 读取，取出选区内的建筑和道路，后面的流程不变。下载链接只下载一次，
+保存在项目里；文件和选区不变时直接复用。命令行：`python -m cityscene new adelaide --bbox ... --osm-file adelaide.osm.pbf`。
 
 ## 渲染距离
 
