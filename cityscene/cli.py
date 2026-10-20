@@ -96,9 +96,10 @@ def main(argv=None) -> int:
             job = Job.open(args.name, settings)
             with open(job.processed_dir / "buildings_classified.geojson", encoding="utf-8") as f:
                 features = json.load(f)["features"]
+            text = reference_obj(features, args.building_id)
             out = args.output or f"{args.building_id.replace('/', '_')}_reference.obj"
             with open(out, "w", encoding="utf-8") as f:
-                f.write(reference_obj(features, args.building_id))
+                f.write(text)
             print(f"Wrote {out}")
         elif args.command == "install":
             installer.install(Job.open(args.name, settings), settings)
