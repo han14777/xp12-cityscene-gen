@@ -33,6 +33,41 @@
     <p class="hint" data-i18n="dsftoolHint"></p>
   </details>
 
+  <!-- Start: choose new / open / import while no project is open -->
+  <section id="start-box">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="new" data-i18n="tabNew"></button>
+      <button class="tab" role="tab" data-tab="open" data-i18n="tabOpen"></button>
+      <button class="tab" role="tab" data-tab="import" data-i18n="tabImport"></button>
+    </div>
+    <div class="tab-panel" data-panel="new">
+      <p class="hint" data-i18n="newHint"></p>
+    </div>
+    <div class="tab-panel" data-panel="open" hidden>
+      <ul id="job-list" class="item-list"></ul>
+    </div>
+    <div class="tab-panel" data-panel="import" hidden>
+      <p class="hint" data-i18n="importHint"></p>
+      <ul id="pack-list" class="item-list"></ul>
+      <label><span data-i18n="importPath"></span>
+        <span class="path-row"><input id="import-path" placeholder="E:/SteamLibrary/steamapps/common/X-Plane 12/Custom Scenery/CityScene_sydney"><button class="browse" data-pick="folder" data-for="import-path" data-i18n="browse"></button></span>
+      </label>
+      <label><span data-i18n="importName"></span><input id="import-name"></label>
+      <button id="import-btn" class="primary" data-i18n="importBtn"></button>
+    </div>
+  </section>
+
+  <!-- The open project -->
+  <section id="project-bar" hidden>
+    <div class="project-row">
+      <div>
+        <div id="project-name"></div>
+        <div id="project-pack" class="hint"></div>
+      </div>
+      <button id="switch-project" class="ghost" data-i18n="switchProject"></button>
+    </div>
+  </section>
+
   <details id="area-box" class="step" open>
     <summary><h2 data-i18n="s1"></h2></summary>
     <input id="search" data-i18n-placeholder="searchPh">
@@ -43,24 +78,15 @@
 
   <details id="job-box" class="step" open>
     <summary><h2 data-i18n="s2"></h2></summary>
-    <label><span data-i18n="jobName"></span><input id="job-name" placeholder="sydney_cbd"></label>
-    <label><span data-i18n="sceneryName"></span><input id="scenery-name" placeholder="CityScene_sydney_cbd"></label>
+    <div id="new-names">
+      <label><span data-i18n="jobName"></span><input id="job-name" placeholder="sydney_cbd"></label>
+      <label><span data-i18n="sceneryName"></span><input id="scenery-name" placeholder="CityScene_sydney_cbd"></label>
+    </div>
     <label><span data-i18n="defaultHeight"></span><input id="default-height" type="number" min="3" max="100" step="1"></label>
     <label><span data-i18n="renderDistance"></span><input id="render-distance" type="number" min="5" max="100" step="1"></label>
     <p class="hint" data-i18n="renderDistanceHint"></p>
     <label class="check"><input id="force-fetch" type="checkbox"> <span data-i18n="forceFetch"></span></label>
-    <button id="build" class="primary" data-i18n="build"></button>
-    <label><span data-i18n="existingJobs"></span><select id="jobs"><option value="">—</option></select></label>
-    <details id="import-box" class="sub-box">
-      <summary data-i18n="importTitle"></summary>
-      <p class="hint" data-i18n="importHint"></p>
-      <label><span data-i18n="importFound"></span><select id="import-packs"></select></label>
-      <label><span data-i18n="importPath"></span>
-        <span class="path-row"><input id="import-path" placeholder="E:/SteamLibrary/steamapps/common/X-Plane 12/Custom Scenery/CityScene_sydney"><button class="browse" data-pick="folder" data-for="import-path" data-i18n="browse"></button></span>
-      </label>
-      <label><span data-i18n="importName"></span><input id="import-name"></label>
-      <button id="import-btn" data-i18n="importBtn"></button>
-    </details>
+    <button id="build" class="primary"></button>
   </details>
 
   <details id="progress-box" class="step" open hidden>

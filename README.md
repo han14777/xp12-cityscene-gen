@@ -38,6 +38,9 @@ Drag the divider next to the map to resize the panel (double-click resets it; th
 step by its title. Every path field has a "Browse…" button that opens the system's file dialog; paths can also be
 typed. A model picked outside the job is copied into its `models/` folder together with its textures.
 
+The panel starts with three choices: **New project**, **Open project** (one made before in this copy) and
+**Import pack** (see below). For a new project:
+
 1. Search for a city, then draw rectangles or polygons with the tools at the top left of the map (several are fine)
 2. Enter a job name and click "Save area and generate"; progress and logs appear as it runs
 3. When done, buildings are shown on the map coloured by height; hover to see the height source and facade style
@@ -46,8 +49,8 @@ typed. A model picked outside the job is copied into its `models/` folder togeth
 ## Importing a pack made by this tool
 
 Every generated pack carries its job in `<pack>/cityscene/` (area, settings, edits, cleaned OSM buildings), so a
-pack can be turned back into a job: open "Import a scenery pack made by this tool" under the job list (packs found
-in Custom Scenery and the build folder are listed), or run `python -m cityscene import <pack folder>`. The pack is
+pack can be turned back into a job: choose "Import pack" at the start (packs found in Custom Scenery and the build
+folder are listed; one already imported offers "Open" instead), or run `python -m cityscene import <pack folder>`. The pack is
 copied; the original stays as it is. After importing you can edit buildings right away, or regenerate with
 "Re-download OSM" ticked to refresh the data.
 

@@ -169,8 +169,9 @@ function refreshLanguage() {
   if (lastStatus) renderStatus(lastStatus);
   if (currentDetail) render({ ...currentDetail, log: [] });
   if (lastMessage) say(lastMessage.key, lastMessage.vars, lastMessage.kind);
-  refreshJobOptions();
+  renderJobList();
   renderPacks();
+  updateMode();
   if (buildingsLayer) { map.removeControl(legend); legend.addTo(map); }
   renderEditCount();
   if (selectedId) fillEditForm();
@@ -249,65 +250,121 @@ $("job-name").addEventListener("input", (e) => {
   $("scenery-name").placeholder = "CityScene_" + (e.target.value || "name");
 });
 
-// ---------- jobs ----------
+// ---------- start: new project / open project / import pack ----------
 let jobList = [];
-
-function refreshJobOptions() {
-  const selected = $("jobs").value;
-  $("jobs").innerHTML = '<option value="">—</option>' +
-    jobList.map((j) => `<option value="${esc(j.name)}">${esc(j.name)}${j.built ? t("built") : ""}</option>`).join("");
-  $("jobs").value = selected;
-}
-
-async function loadJobs(select) {
-  jobList = await api("/api/jobs");
-  refreshJobOptions();
-  if (select) $("jobs").value = select;
-}
-
-$("jobs").onchange = (e) => { if (e.target.value) openJob(e.target.value, true); };
-
-// ---------- importing a pack made by this tool ----------
 let packList = [];
+let startTab = ["new", "open", "import"].includes(store.get("cityscene.startTab")) ? store.get("cityscene.startTab") : "new";
+
+function showTab(tab) {
+  startTab = tab;
+  store.set("cityscene.startTab", tab);
+  document.querySelectorAll("#start-box .tab").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  document.querySelectorAll("#start-box .tab-panel").forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+  updateMode();
+  if (tab === "open") loadJobs().catch(sayError);
+  if (tab === "import") loadPacks();
+}
+
+document.querySelectorAll("#start-box .tab").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
+
+// The start chooser shows while no project is open; once one is, the project bar and its steps show instead
+function updateMode() {
+  const open = Boolean(currentJob);
+  $("start-box").hidden = open;
+  $("project-bar").hidden = !open;
+  const editing = open || startTab === "new";
+  $("area-box").hidden = !editing;
+  $("job-box").hidden = !editing;
+  $("new-names").hidden = open;
+  $("build").textContent = t(open ? "rebuild" : "build");
+  if (!open) for (const id of ["progress-box", "result-box", "edit-box"]) $(id).hidden = true;
+  $("project-name").textContent = currentJob || "";
+  $("project-pack").textContent = currentDetail ? t("projectPack", { pack: currentDetail.meta.scenery_name }) : "";
+}
+
+function renderJobList() {
+  $("job-list").innerHTML = jobList.length ? jobList.map((j) => `
+    <li><div class="item-text"><b>${esc(j.name)}</b><div class="hint">${esc(j.scenery_name)} · ${esc(t(j.built ? "stateBuilt" : "stateNotBuilt"))}</div></div>
+      <div class="item-actions"><button class="ghost" data-open="${esc(j.name)}">${esc(t("openBtn"))}</button></div></li>`).join("")
+    : `<li class="empty">${esc(t("noJobs"))}</li>`;
+  $("job-list").querySelectorAll("[data-open]").forEach((b) => { b.onclick = () => openJob(b.dataset.open, true).catch(sayError); });
+}
+
+async function loadJobs() {
+  jobList = await api("/api/jobs");
+  renderJobList();
+}
+
+function renderPacks() {
+  $("pack-list").innerHTML = packList.length ? packList.map((p, i) => {
+    const notes = [t("source_" + p.source)];
+    if (p.kind === "legacy") notes.push(t("legacyTag"));
+    if (p.existing_job) notes.push(t("alreadyImported", { name: p.existing_job }));
+    const actions = p.existing_job
+      ? `<button class="ghost" data-open="${esc(p.existing_job)}">${esc(t("openBtn"))}</button><button class="ghost" data-reimport="${i}">${esc(t("reimportBtn"))}</button>`
+      : `<button data-import="${i}">${esc(t("importBtn"))}</button>`;
+    return `<li><div class="item-text"><b>${esc(p.folder)}</b><div class="hint">${esc(notes.join(" · "))}</div></div><div class="item-actions">${actions}</div></li>`;
+  }).join("") : `<li class="empty">${esc(t("importNone"))}</li>`;
+  $("pack-list").querySelectorAll("[data-open]").forEach((b) => { b.onclick = () => openJob(b.dataset.open, true).catch(sayError); });
+  $("pack-list").querySelectorAll("[data-import]").forEach((b) => {
+    b.onclick = () => importPack(packList[b.dataset.import].path, "", false);
+  });
+  $("pack-list").querySelectorAll("[data-reimport]").forEach((b) => {
+    const p = packList[b.dataset.reimport];
+    b.onclick = () => { if (confirm(t("confirmReimport", { name: p.existing_job }))) importPack(p.path, p.existing_job, true); };
+  });
+}
 
 async function loadPacks() {
   try {
-    packList = await api("/api/packs");
+    [packList, jobList] = await Promise.all([api("/api/packs"), api("/api/jobs")]);
     renderPacks();
   } catch (e) { sayError(e); }
 }
 
-function renderPacks() {
-  $("import-packs").innerHTML = `<option value="">${esc(packList.length ? t("importPick") : t("importNone"))}</option>` +
-    packList.map((p, i) => `<option value="${i}">${esc(p.folder)} · ${esc(t("source_" + p.source))}${p.kind === "legacy" ? " · " + esc(t("legacyTag")) : ""}${p.existing_job ? " · " + esc(t("alreadyImported", { name: p.existing_job })) : ""}</option>`).join("");
+function uniqueName(base) {
+  const names = new Set(jobList.map((j) => j.name));
+  let i = 2;
+  while (names.has(`${base}_${i}`)) i++;
+  return `${base}_${i}`;
 }
 
-$("import-box").addEventListener("toggle", () => { if ($("import-box").open) loadPacks(); });
-
-$("import-packs").onchange = (e) => {
-  const p = packList[e.target.value];
-  if (!p) return;
-  $("import-path").value = p.path;
-  $("import-name").value = p.name;
-};
-
-async function importPack(overwrite) {
-  const path = $("import-path").value.trim();
+// A pack already imported is offered as "Open"; importing a different pack whose job name is taken asks for a new name
+async function importPack(path, name, overwrite) {
   if (!path) return say("importNeedPath", {}, "warn");
   say("importing", {}, "");
   try {
-    const r = await api("/api/import", { body: { path, name: $("import-name").value.trim(), overwrite } });
-    await loadJobs(r.name);
+    const r = await api("/api/import", { body: { path, name, overwrite } });
     await openJob(r.name, true);
     say(r.kind === "legacy" ? "importedLegacy" : "imported", { name: r.name, blocks: r.blocks, edits: r.edits, models: r.models }, "ok");
-    loadPacks();
   } catch (e) {
-    if (!overwrite && /already exists/.test(e.message) && confirm(t("importConfirmOverwrite", { msg: e.message }))) return importPack(true);
-    sayError(e);
+    const taken = !overwrite && (e.message.match(/^Job (\S+) already exists/) || [])[1];
+    if (!taken) return sayError(e);
+    const chosen = prompt(t("importNameTaken", { name: taken }), uniqueName(taken));
+    if (chosen && chosen.trim()) return importPack(path, chosen.trim(), false);
+    say(null, { text: "" });
   }
 }
 
-$("import-btn").onclick = () => importPack(false);
+$("import-btn").onclick = () => importPack($("import-path").value.trim(), $("import-name").value.trim(), false);
+
+$("switch-project").onclick = () => {
+  clearInterval(pollTimer);
+  currentJob = null;
+  currentDetail = null;
+  selectedId = null;
+  edits = {};
+  zoneLayer.clearLayers();
+  updateArea();
+  if (buildingsLayer) { map.removeLayer(buildingsLayer); buildingsLayer = null; }
+  map.removeControl(legend);
+  $("edit-form").hidden = true;
+  $("job-name").value = "";
+  $("scenery-name").value = "";
+  $("log").textContent = "";
+  say(null, { text: "" });
+  showTab(startTab);
+};
 
 async function openJob(name, fit) {
   currentJob = name;
@@ -327,18 +384,21 @@ async function openJob(name, fit) {
   updateArea();
   if (fit && zoneLayer.getLayers().length) map.fitBounds(zoneLayer.getBounds());
   render(d);
+  updateMode();
   if (d.run.state === "running") startPolling();
   else if (d.built) loadBuildings();
 }
 
 $("build").onclick = async () => {
-  const name = $("job-name").value.trim();
+  const name = currentJob || $("job-name").value.trim();
   if (!name) return say("needName", {}, "warn");
   if (!zoneLayer.getLayers().length) return say("needZone", {}, "warn");
   const area = zoneArea();
   if (area > 25 && !confirm(t("confirmLarge", { km2: area.toFixed(1) }))) return;
+  await loadJobs();
   const existing = jobList.some((j) => j.name === name);
   if (existing && name !== currentJob && !confirm(t("confirmOverwrite", { name }))) return;
+  const sceneryName = currentJob ? currentDetail.meta.scenery_name : $("scenery-name").value.trim();
   try {
     const options = {};
     const dh = parseFloat($("default-height").value);
@@ -346,10 +406,11 @@ $("build").onclick = async () => {
     const rd = parseFloat($("render-distance").value);
     if (rd > 0) options.dsf = { render_distance_km: rd };
     await api("/api/jobs", { body: {
-      name, scenery_name: $("scenery-name").value.trim(), zone: zoneLayer.toGeoJSON(), options, overwrite: existing,
+      name, scenery_name: sceneryName, zone: zoneLayer.toGeoJSON(), options, overwrite: existing,
     } });
-    await loadJobs(name);
+    await loadJobs();
     currentJob = name;
+    updateMode();
     logSince = 0;
     $("log").textContent = "";
     await api(`/api/jobs/${name}/build`, { body: { force_fetch: $("force-fetch").checked } });
@@ -371,7 +432,7 @@ async function poll() {
     render(d);
     if (d.run.state !== "running") {
       clearInterval(pollTimer);
-      if (d.run.state === "done") { say("done", {}, "ok"); loadBuildings(); loadJobs(currentJob); }
+      if (d.run.state === "done") { say("done", {}, "ok"); loadBuildings(); }
       if (d.run.state === "error") say("failed", { err: d.run.error }, "err");
     }
   } catch (e) { sayError(e); clearInterval(pollTimer); }
@@ -623,4 +684,4 @@ updatePanelToggle();
 addDrawControl();
 updateArea();
 loadStatus().catch(sayError);
-loadJobs().catch(sayError);
+showTab(startTab);
